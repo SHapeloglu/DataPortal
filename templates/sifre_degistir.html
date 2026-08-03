@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% set active = "sifre-degistir" %}
+{% block title %}Şifre Değiştir — DataPortal{% endblock %}
+{% block extra_style %}
+.pw-strength { height: 3px; border-radius: 2px; margin-top: 6px; transition: all 0.3s; background: var(--border2); }
+.pw-strength.weak   { background: var(--danger); width: 33%; }
+.pw-strength.medium { background: var(--warn);   width: 66%; }
+.pw-strength.strong { background: var(--accent);  width: 100%; }
+.form-card { max-width: 440px; }
+.rule { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; transition: color 0.2s; }
+.rule.ok { color: var(--accent); }
+.rule::before { content: '○'; font-size: 0.7rem; }
+.rule.ok::before { content: '✓'; }
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>🔑 Şifre Değiştir</h1>
+  <p>Hesabınızın şifresini güncelleyin</p>
+</div>
+<div class="card form-card">
+  <div class="field">
+    <label>Mevcut Şifre</label>
+    <input id="mevcut" type="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <div class="field">
+    <label>Yeni Şifre</label>
+    <input id="yeni" type="password" placeholder="••••••••" autocomplete="new-password" oninput="checkRules()">
+    <div class="pw-strength" id="str-bar"></div>
+  </div>
+  <div style="margin: -4px 0 16px; padding: 12px 14px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border);">
+    <div class="rule" id="r-len">En az 8 karakter</div>
+    <div class="rule" id="r-upper">En az 1 büyük harf</div>
+    <div class="rule" id="r-lower">En az 1 küçük harf</div>
+    <div class="rule" id="r-digit">En az 1 rakam</div>
+  </div>
+  <div class="field">
+    <label>Yeni Şifre (Tekrar)</label>
+    <input id="tekrar" type="password" placeholder="••••••••" autocomplete="new-password">
+  </div>
+  <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="degistir()">
+    <span id="btn-lbl">Şifremi Güncelle</span>
+  </button>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function checkRules() {
+  const pw = document.getElementById('yeni').value;
+  const set = (id, ok) => { document.getElementById(id).classList.toggle('ok', ok); };
+  set('r-len',   pw.length >= 8);
+  set('r-upper', /[A-Z]/.test(pw));
+  set('r-lower', /[a-z]/.test(pw));
+  set('r-digit', /\d/.test(pw));
+  let score = [pw.length>=8, /[A-Z]/.test(pw), /[a-z]/.test(pw), /\d/.test(pw)].filter(Boolean).length;
+  const bar = document.getElementById('str-bar');
+  bar.className = 'pw-strength ' + (score <= 2 ? 'weak' : score === 3 ? 'medium' : 'strong');
+}
+
+async function degistir() {
+  const mevcut = document.getElementById('mevcut').value;
+  const yeni   = document.getElementById('yeni').value;
+  const tekrar = document.getElementById('tekrar').value;
+  if (!mevcut || !yeni || !tekrar) { toast('Tüm alanlar zorunludur.', 'error'); return; }
+  if (yeni !== tekrar) { toast('Yeni şifreler eşleşmiyor.', 'error'); return; }
+
+  const btn = document.getElementById('btn-lbl');
+  btn.textContent = 'Güncelleniyor...';
+  const r = await api('/api/sifre-degistir', 'POST', { mevcut, yeni, tekrar });
+  btn.textContent = 'Şifremi Güncelle';
+
+  if (r.ok) {
+    toast('Şifreniz başarıyla güncellendi.');
+    document.getElementById('mevcut').value = '';
+    document.getElementById('yeni').value   = '';
+    document.getElementById('tekrar').value = '';
+    document.getElementById('str-bar').className = 'pw-strength';
+    ['r-len','r-upper','r-lower','r-digit'].forEach(id => document.getElementById(id).classList.remove('ok'));
+  } else {
+    toast(r.msg || 'Hata oluştu.', 'error');
+  }
+}
+</script>
+{% endblock %}

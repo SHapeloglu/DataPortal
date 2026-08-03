@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% set active = "onay-bekleyenler" %}
+{% block title %}Onay Bekleyenler — DataPortal{% endblock %}
+
+{% block extra_style %}
+.dosya-card{background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:16px;margin-bottom:10px;}
+.dosya-card:hover{border-color:var(--accent);}
+.dosya-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;}
+.dosya-icon{font-size:1.6rem;flex-shrink:0;}
+.dosya-info{flex:1;min-width:0;}
+.dosya-adi{font-size:.92rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dosya-meta{font-size:.75rem;color:var(--muted);margin-top:3px;}
+.dosya-meta span{margin-right:12px;}
+.dosya-actions{display:flex;gap:8px;margin-top:12px;}
+.red-form{display:none;margin-top:10px;}
+.red-form textarea{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:inherit;font-size:.83rem;outline:none;resize:vertical;}
+.red-form textarea:focus{border-color:var(--danger);}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty-state .ico{font-size:3rem;margin-bottom:12px;}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>✅ Onay Bekleyenler</h1>
+  <p>İncelemenizi bekleyen dosyalar</p>
+</div>
+
+<div id="liste">
+  <div style="text-align:center;padding:40px;color:var(--muted);">Yükleniyor…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function yukle() {
+  const r = await api('/api/onay-bekleyenler');
+  const el = document.getElementById('liste');
+  if(!r.ok) { el.innerHTML = `<div style="color:var(--danger)">Hata: ${r.msg}</div>`; return; }
+  if(!r.dosyalar.length) {
+    el.innerHTML = `<div class="empty-state"><div class="ico">🎉</div><div>Onay bekleyen dosya yok.</div></div>`;
+    return;
+  }
+  el.innerHTML = r.dosyalar.map(d => `
+    <div class="dosya-card" id="card-${d.DosyaID}">
+      <div class="dosya-header">
+        <div class="dosya-icon">📄</div>
+        <div class="dosya-info">
+          <div class="dosya-adi" title="${esc(d.OrijinalAd)}">${esc(d.OrijinalAd)}</div>
+          <div class="dosya-meta">
+            <span>📁 ${esc(d.DizinAdi)}</span>
+            <span>👤 ${esc(d.YukleyenAdi)}</span>
+            <span>📅 ${(d.YuklemeTarihi||'').slice(0,16)}</span>
+            <span>📊 ${d.SatirSayisi||'?'} satır</span>
+          </div>
+          ${d.Notlar ? `<div style="font-size:.8rem;color:var(--muted);margin-top:4px;font-style:italic;">"${esc(d.Notlar)}"</div>` : ''}
+        </div>
+      </div>
+      <div class="dosya-actions">
+        <button class="btn btn-primary btn-sm" onclick="karar('${d.DosyaID}','onaylandi')">✓ Onayla</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="redFormAc('${d.DosyaID}')">✕ Reddet</button>
+      </div>
+      <div class="red-form" id="red-${d.DosyaID}">
+        <textarea id="acik-${d.DosyaID}" rows="2" placeholder="Red nedeni (zorunlu)…"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="karar('${d.DosyaID}','reddedildi')">Reddet</button>
+          <button class="btn btn-ghost btn-sm" onclick="redFormKapat('${d.DosyaID}')">İptal</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function redFormAc(id)  { document.getElementById('red-'+id).style.display='block'; }
+function redFormKapat(id){ document.getElementById('red-'+id).style.display='none'; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function karar(dosyaId, karar) {
+  const acik = karar === 'reddedildi'
+    ? (document.getElementById('acik-'+dosyaId)?.value||'').trim()
+    : '';
+  if(karar === 'reddedildi' && !acik) {
+    toast('Red için açıklama zorunludur.', 'error'); return;
+  }
+  const r = await api(`/api/dosya-karar/${dosyaId}`, 'POST', {karar, aciklama: acik});
+  if(r.ok) {
+    toast(r.msg, 'success');
+    document.getElementById('card-'+dosyaId)?.remove();
+    // Eğer kart yoksa boş state göster
+    if(!document.querySelector('.dosya-card')) {
+      document.getElementById('liste').innerHTML =
+        '<div class="empty-state"><div class="ico">🎉</div><div>Onay bekleyen dosya yok.</div></div>';
+    }
+  } else {
+    toast(r.msg, 'error');
+  }
+}
+
+yukle();
+</script>
+{% endblock %}

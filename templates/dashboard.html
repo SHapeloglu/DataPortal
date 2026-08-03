@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+{% block title %}Dashboard — DataPortal{% endblock %}
+
+{% block extra_style %}
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; }
+.stat-card .label { font-size: 0.75rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+.stat-card .value { font-size: 2rem; font-weight: 700; letter-spacing: -1px; }
+.stat-card .sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.v-green{color:var(--accent)} .v-blue{color:var(--accent2)} .v-pink{color:#f472b6}
+
+.yetki-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.yetki-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+.yetki-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+/* Tablo paneller */
+.tablo-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.tablo-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.tablo-panel-header { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.tablo-panel-title { font-size: 0.95rem; font-weight: 700; }
+.tablo-panel-count { margin-left: auto; font-size: 0.75rem; font-weight: 600; padding: 2px 10px; border-radius: 20px; }
+.count-blue { background: rgba(56,189,248,0.12); color: var(--accent2); border: 1px solid rgba(56,189,248,0.2); }
+.count-red  { background: rgba(248,113,113,0.12); color: var(--danger);  border: 1px solid rgba(248,113,113,0.2); }
+.tablo-search { width: 100%; background: var(--bg); border: none; border-bottom: 1px solid var(--border); padding: 9px 20px; color: var(--text); font-family: inherit; font-size: 0.82rem; outline: none; }
+.tablo-list { max-height: 300px; overflow-y: auto; padding: 6px 8px; }
+.tablo-list::-webkit-scrollbar { width: 4px; }
+.tablo-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* Tablo satırı */
+.tablo-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px;
+  transition: background 0.15s; cursor: default;
+}
+.tablo-row:hover { background: var(--surface2); }
+.tablo-row-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dot-blue{background:var(--accent2)} .dot-red{background:var(--danger)}
+.tablo-row-body { min-width: 0; }
+.tablo-row-name { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tablo-row-meta { display: flex; gap: 10px; margin-top: 3px; flex-wrap: wrap; }
+.tablo-meta-item { font-size: 0.7rem; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+.tablo-meta-item .mi-label { color: var(--muted); }
+.tablo-meta-item .mi-val { color: var(--text); }
+.tablo-meta-item .mi-val.loading { color: var(--border2); font-style: italic; }
+
+.detail-btn {
+  width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border2);
+  background: none; color: var(--muted); cursor: pointer; font-size: 0.78rem;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: all 0.2s;
+}
+.detail-btn:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(56,189,248,0.08); }
+
+/* Geçmiş Modalı */
+.log-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+.log-modal-overlay.open { display: flex; }
+.log-modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 640px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; animation: slideUp 0.2s ease; }
+@keyframes slideUp { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+.log-modal-header { display: flex; align-items: center; gap: 10px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.log-modal-title { font-size: 1rem; font-weight: 700; }
+.log-modal-table-name { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--accent2); background: rgba(56,189,248,0.1); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.2); }
+.log-modal-close { margin-left: auto; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border2); background: none; color: var(--muted); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+.log-modal-close:hover { border-color: var(--danger); color: var(--danger); }
+
+.log-summary { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+.log-sum-item { flex: 1; padding: 14px 20px; border-right: 1px solid var(--border); }
+.log-sum-item:last-child { border-right: none; }
+.log-sum-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.log-sum-val { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+.log-sum-sub { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+.log-body { overflow-y: auto; flex: 1; }
+.log-body::-webkit-scrollbar { width: 4px; }
+.log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+.log-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.log-table th { padding: 10px 16px; text-align: left; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); }
+.log-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); color: var(--text); }
+.log-table tr:last-child td { border-bottom: none; }
+.log-table tr:hover td { background: var(--surface2); }
+.islem-badge { padding: 2px 8px; border-radius: 5px; font-size: 0.72rem; font-weight: 600; }
+.badge-yukle { background: rgba(56,189,248,0.12); color: var(--accent2); border: 1px solid rgba(56,189,248,0.2); }
+.badge-olustur { background: rgba(110,231,183,0.12); color: var(--accent); border: 1px solid rgba(110,231,183,0.2); }
+.log-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 0.875rem; }
+.log-loading { padding: 40px; text-align: center; color: var(--muted); }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border2); border-top-color: var(--accent2); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Hızlı erişim */
+.quick-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.edit-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); cursor: pointer; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border2); background: none; transition: all 0.2s; }
+.edit-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.edit-toggle.active { border-color: var(--accent); color: var(--accent); background: rgba(110,231,183,0.08); }
+.quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; min-height: 60px; }
+.quick-grid.edit-mode .quick-card { cursor: grab; }
+.quick-card { background: var(--surface2); border: 1px solid var(--border2); border-radius: 12px; padding: 16px; text-decoration: none; transition: all 0.2s; display: flex; flex-direction: column; gap: 5px; position: relative; user-select: none; }
+.quick-card:not(.edit-mode-card):hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+.quick-card.edit-mode-card { border-style: dashed; }
+.quick-card.dragging { opacity: 0.4; transform: scale(0.97); }
+.quick-card.drag-over { border-color: var(--accent); background: rgba(110,231,183,0.06); }
+.q-icon{font-size:1.3rem} .q-title{font-size:0.85rem;font-weight:700;color:var(--text)} .q-desc{font-size:0.73rem;color:var(--muted)}
+.q-remove { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 50%; background: rgba(248,113,113,0.15); border: 1px solid rgba(248,113,113,0.3); color: var(--danger); font-size: 0.7rem; display: none; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
+.q-remove:hover { background: rgba(248,113,113,0.3); }
+.edit-mode .q-remove { display: flex; }
+.drag-handle { position: absolute; top: 8px; left: 8px; color: var(--muted); font-size: 0.7rem; display: none; cursor: grab; }
+.edit-mode .drag-handle { display: block; }
+.add-panel { display: none; margin-top: 14px; padding: 16px; background: var(--bg); border: 1px dashed var(--border2); border-radius: 10px; }
+.add-panel.open { display: block; }
+.add-panel-title { font-size: 0.75rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+.add-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.add-card { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border2); border-radius: 9px; cursor: pointer; transition: all 0.2s; font-size: 0.82rem; color: var(--muted); }
+.add-card:hover:not(.added) { border-color: var(--accent); color: var(--accent); }
+.add-card.added { opacity: 0.35; cursor: not-allowed; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Hoş geldiniz, {{ kullanici_adi }} 👋</h1>
+  <p>Sistem geneline genel bakış</p>
+</div>
+
+<div class="stats">
+  <div class="stat-card"><div class="label">Kullanıcılar</div><div class="value v-green" id="s-kullanici">—</div><div class="sub">kayıtlı kullanıcı</div></div>
+  <div class="stat-card"><div class="label">Roller</div><div class="value v-blue" id="s-rol">—</div><div class="sub">tanımlı rol</div></div>
+  <div class="stat-card"><div class="label">Yetkiler</div><div class="value v-pink" id="s-yetki">—</div><div class="sub">sistem yetkisi</div></div>
+  {% if rol_tablolari %}<div class="stat-card"><div class="label">Tablolarım</div><div class="value v-green">{{ rol_tablolari|length }}</div><div class="sub">erişilebilir tablo</div></div>{% endif %}
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header"><h2>Yetkilerim</h2></div>
+  <div class="yetki-cards" id="yetki-cards">
+    {% for yid in yetkiler %}
+    <div class="yetki-item">
+      <div class="yetki-dot"></div>
+      <span class="mono" style="font-size:0.75rem;color:var(--muted);width:60px;flex-shrink:0;">{{ yid }}</span>
+      <span style="font-size:0.85rem;" id="yn-{{ yid }}">—</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if rol_tablolari and ('Y000004' in yetkiler or 'Y000005' in yetkiler) %}
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header"><h2>Tablo Yetkilerim</h2></div>
+  <div class="tablo-panels">
+
+    {% if 'Y000004' in yetkiler %}
+    <div class="tablo-panel">
+      <div class="tablo-panel-header">
+        <span>⬜</span>
+        <span class="tablo-panel-title">Yükleyebileceğim Tablolar</span>
+        <span class="tablo-panel-count count-blue">{{ rol_tablolari|length }}</span>
+      </div>
+      <input class="tablo-search" placeholder="🔍 Ara..." oninput="filterList('ll', this.value)">
+      <div class="tablo-list" id="ll">
+        {% for t in rol_tablolari %}
+        <div class="tablo-row" data-name="{{ t }}">
+          <div class="tablo-row-dot dot-blue"></div>
+          <div class="tablo-row-body">
+            <div class="tablo-row-name">{{ t }}</div>
+            <div class="tablo-row-meta" id="meta-l-{{ loop.index }}">
+              <span class="tablo-meta-item"><span class="mi-label">Oluşturan:</span><span class="mi-val loading" id="ilk-kisi-l-{{ loop.index }}">yükleniyor…</span></span>
+              <span class="tablo-meta-item"><span class="mi-label">İlk:</span><span class="mi-val loading" id="ilk-tarih-l-{{ loop.index }}">—</span></span>
+              <span class="tablo-meta-item"><span class="mi-label">Son yükleme:</span><span class="mi-val loading" id="son-tarih-l-{{ loop.index }}">—</span></span>
+            </div>
+          </div>
+          <button class="detail-btn" onclick="openLog('{{ t }}')" title="Yükleme geçmişi">⊞</button>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'Y000005' in yetkiler %}
+    <div class="tablo-panel">
+      <div class="tablo-panel-header">
+        <span>✕</span>
+        <span class="tablo-panel-title">Silebileceğim Tablolar</span>
+        <span class="tablo-panel-count count-red">{{ rol_tablolari|length }}</span>
+      </div>
+      <input class="tablo-search" placeholder="🔍 Ara..." oninput="filterList('dl', this.value)">
+      <div class="tablo-list" id="dl">
+        {% for t in rol_tablolari %}
+        <div class="tablo-row" data-name="{{ t }}">
+          <div class="tablo-row-dot dot-red"></div>
+          <div class="tablo-row-body">
+            <div class="tablo-row-name">{{ t }}</div>
+            <div class="tablo-row-meta">
+              <span class="tablo-meta-item"><span class="mi-label">Oluşturan:</span><span class="mi-val loading" id="ilk-kisi-d-{{ loop.index }}">yükleniyor…</span></span>
+              <span class="tablo-meta-item"><span class="mi-label">İlk:</span><span class="mi-val loading" id="ilk-tarih-d-{{ loop.index }}">—</span></span>
+              <span class="tablo-meta-item"><span class="mi-label">Son yükleme:</span><span class="mi-val loading" id="son-tarih-d-{{ loop.index }}">—</span></span>
+            </div>
+          </div>
+          <button class="detail-btn" onclick="openLog('{{ t }}')" title="Yükleme geçmişi">⊞</button>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+<!-- HIZLI ERİŞİM -->
+<div class="card">
+  <div class="quick-header">
+    <h2>Hızlı Erişim</h2>
+    <button class="edit-toggle" id="edit-btn" onclick="toggleEdit()">✎ Düzenle</button>
+  </div>
+  <div class="quick-grid" id="quick-grid"></div>
+  <div class="add-panel" id="add-panel">
+    <div class="add-panel-title">Eklenebilir Kartlar</div>
+    <div class="add-cards-grid" id="add-cards-grid"></div>
+  </div>
+</div>
+
+<!-- DETAY / GEÇMİŞ MODALI -->
+<div class="log-modal-overlay" id="log-overlay">
+  <div class="log-modal">
+    <div class="log-modal-header">
+      <span class="log-modal-title">Yükleme Geçmişi</span>
+      <span class="log-modal-table-name" id="log-tablo-adi"></span>
+      <button class="log-modal-close" onclick="closeLog()">✕</button>
+    </div>
+    <div class="log-summary" id="log-summary"></div>
+    <div class="log-body" id="log-body">
+      <div class="log-loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── TABLO BİLGİLERİ ──────────────────────────────────────────
+const ROL_TABLOLARI = {{ rol_tablolari | tojson }};
+
+function fmt(dt) {
+  if (!dt) return '—';
+  return dt.substring(0, 16).replace('T',' ');
+}
+
+async function tabloInfoYukle() {
+  // Her tablo için bilgi çek — toplu paralel istek
+  const prefixes = [];
+  {% if 'Y000004' in yetkiler %}prefixes.push('l');{% endif %}
+  {% if 'Y000005' in yetkiler %}prefixes.push('d');{% endif %}
+
+  ROL_TABLOLARI.forEach((tablo, i) => {
+    const idx = i + 1;
+    fetch(`/api/tablo-info/${encodeURIComponent(tablo)}`)
+      .then(r => r.json())
+      .then(data => {
+        prefixes.forEach(p => {
+          const ilkKisi  = document.getElementById(`ilk-kisi-${p}-${idx}`);
+          const ilkTarih = document.getElementById(`ilk-tarih-${p}-${idx}`);
+          const sonTarih = document.getElementById(`son-tarih-${p}-${idx}`);
+          if (!ilkKisi) return;
+          if (data.ok) {
+            ilkKisi.textContent  = data.ilk ? (data.ilk.KullaniciAdi || '—') : '—';
+            ilkTarih.textContent = data.ilk ? fmt(data.ilk.IslemTarihi) : '—';
+            sonTarih.textContent = data.son
+              ? `${fmt(data.son.IslemTarihi)} (${data.son.Eklenen} satır)`
+              : '—';
+          } else {
+            ilkKisi.textContent = sonTarih.textContent = ilkTarih.textContent = '—';
+          }
+          [ilkKisi, ilkTarih, sonTarih].forEach(el => el && el.classList.remove('loading'));
+        });
+      })
+      .catch(() => {
+        prefixes.forEach(p => {
+          [
+            document.getElementById(`ilk-kisi-${p}-${idx}`),
+            document.getElementById(`ilk-tarih-${p}-${idx}`),
+            document.getElementById(`son-tarih-${p}-${idx}`)
+          ].forEach(el => { if(el){ el.textContent='—'; el.classList.remove('loading'); } });
+        });
+      });
+  });
+}
+
+// ── GEÇMİŞ MODALI ────────────────────────────────────────────
+async function openLog(tablo) {
+  document.getElementById('log-tablo-adi').textContent = tablo;
+  document.getElementById('log-summary').innerHTML = '';
+  document.getElementById('log-body').innerHTML = '<div class="log-loading"><div class="spinner"></div></div>';
+  document.getElementById('log-overlay').classList.add('open');
+
+  const [info, log] = await Promise.all([
+    fetch(`/api/tablo-info/${encodeURIComponent(tablo)}`).then(r=>r.json()),
+    fetch(`/api/tablo-log/${encodeURIComponent(tablo)}`).then(r=>r.json())
+  ]);
+
+  // Özet satırı
+  document.getElementById('log-summary').innerHTML = `
+    <div class="log-sum-item">
+      <div class="log-sum-label">Oluşturan</div>
+      <div class="log-sum-val">${info.ilk ? (info.ilk.KullaniciAdi||'—') : '—'}</div>
+      <div class="log-sum-sub">${info.ilk ? fmt(info.ilk.IslemTarihi) : 'Kayıt yok'}</div>
+    </div>
+    <div class="log-sum-item">
+      <div class="log-sum-label">Son Yükleme</div>
+      <div class="log-sum-val">${info.son ? fmt(info.son.IslemTarihi) : '—'}</div>
+      <div class="log-sum-sub">${info.son ? (info.son.KullaniciAdi||'—') + ' · ' + info.son.Eklenen + ' satır' : 'Henüz yükleme yok'}</div>
+    </div>
+    <div class="log-sum-item">
+      <div class="log-sum-label">Toplam İşlem</div>
+      <div class="log-sum-val">${log.ok ? log.log.length : '—'}</div>
+      <div class="log-sum-sub">kayıtlı işlem</div>
+    </div>`;
+
+  // Geçmiş tablosu
+  if (!log.ok || !log.log.length) {
+    document.getElementById('log-body').innerHTML = '<div class="log-empty">Henüz yükleme geçmişi bulunmuyor.</div>';
+    return;
+  }
+  document.getElementById('log-body').innerHTML = `
+    <table class="log-table">
+      <thead><tr>
+        <th>Tarih</th><th>İşlem</th><th>Kullanıcı</th>
+        <th style="text-align:right">Eklenen</th>
+        <th style="text-align:right">Tekrar</th>
+        <th style="text-align:right">Atlanan</th>
+      </tr></thead>
+      <tbody>
+        ${log.log.map(r => `
+        <tr>
+          <td style="font-family:'DM Mono',monospace;font-size:0.78rem;">${fmt(r.IslemTarihi)}</td>
+          <td><span class="islem-badge ${r.IslemTuru==='YUKLE'?'badge-yukle':'badge-olustur'}">${r.IslemTuru}</span></td>
+          <td>${r.KullaniciAdi||'—'}</td>
+          <td style="text-align:right;color:var(--accent)">${r.Eklenen||0}</td>
+          <td style="text-align:right;color:#fbbf24">${r.Tekrar||0}</td>
+          <td style="text-align:right;color:var(--danger)">${r.Atlanan||0}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function closeLog() {
+  document.getElementById('log-overlay').classList.remove('open');
+}
+document.getElementById('log-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeLog();
+});
+
+// ── TABLO FİLTRE ─────────────────────────────────────────────
+function filterList(id, q) {
+  document.querySelectorAll(`#${id} .tablo-row`).forEach(el => {
+    el.style.display = el.dataset.name.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ── HIZLI ERİŞİM ─────────────────────────────────────────────
+const TUM_KARTLAR = [
+  { id:'excel-create', icon:'⬛', title:'Excel → Tablo Oluştur', desc:'Yeni tablo oluştur',     url:'/excel-mysql-create', yetki:'Y000003' },
+  { id:'excel-load',   icon:'⬜', title:'Excel → Tabloya Yükle', desc:'Veri import et',         url:'/excel-mysql-load',   yetki:'Y000004' },
+  { id:'tablo-sil',    icon:'✕',  title:'Tablo Sil',             desc:'Tabloları sil',          url:'/tablo-sil',          yetki:'Y000005' },
+  { id:'kullanicilar', icon:'◯',  title:'Kullanıcılar',          desc:'Kullanıcı yönetimi',     url:'/kullanicilar',       yetki:null },
+  { id:'roller',       icon:'◐',  title:'Roller',                desc:'Rol & yetki yönetimi',   url:'/roller',             yetki:null },
+  { id:'yetkiler',     icon:'◑',  title:'Yetkiler',              desc:'Yetki tanımları',        url:'/yetkiler',           yetki:null },
+];
+const KULLANICI_YETKILER = new Set({{ yetkiler | list | tojson }});
+const VARSAYILAN = ['excel-create','excel-load','tablo-sil','kullanicilar','roller'];
+let aktifKartlar = [], editMode = false, dragSrc = null;
+
+function yetkiliKartlar() { return TUM_KARTLAR.filter(k => !k.yetki || KULLANICI_YETKILER.has(k.yetki)); }
+
+async function tercihYukle() {
+  try {
+    const r = await fetch('/api/dashboard-tercih').then(r=>r.json());
+    if (r.ok && r.deger) {
+      const kayitli = JSON.parse(r.deger);
+      const gecerli = yetkiliKartlar().map(k=>k.id);
+      aktifKartlar = kayitli.filter(id => gecerli.includes(id));
+      if (!aktifKartlar.length) aktifKartlar = varsayilanSec();
+    } else { aktifKartlar = varsayilanSec(); }
+  } catch { aktifKartlar = varsayilanSec(); }
+  render();
+}
+
+function varsayilanSec() {
+  const gecerli = yetkiliKartlar().map(k=>k.id);
+  return VARSAYILAN.filter(id => gecerli.includes(id));
+}
+
+async function tercihKaydet() {
+  await fetch('/api/dashboard-tercih', {
+    method:'POST', headers:{'Content-Type':'application/json', 'X-CSRF-Token': CSRF_TOKEN},
+    body: JSON.stringify({deger: JSON.stringify(aktifKartlar)})
+  });
+}
+
+function render() {
+  const grid = document.getElementById('quick-grid');
+  grid.innerHTML = '';
+  grid.className = 'quick-grid' + (editMode ? ' edit-mode' : '');
+  aktifKartlar.forEach(id => {
+    const k = TUM_KARTLAR.find(x=>x.id===id); if (!k) return;
+    const el = document.createElement(editMode ? 'div' : 'a');
+    if (!editMode) el.href = k.url;
+    el.className = 'quick-card' + (editMode ? ' edit-mode-card' : '');
+    el.dataset.id = k.id;
+    el.innerHTML = `
+      <span class="drag-handle" title="Sürükle">⠿</span>
+      <button class="q-remove" onclick="kartSil('${k.id}')" title="Kaldır">✕</button>
+      <span class="q-icon">${k.icon}</span>
+      <span class="q-title">${k.title}</span>
+      <span class="q-desc">${k.desc}</span>`;
+    if (editMode) setupDrag(el);
+    grid.appendChild(el);
+  });
+  renderAddPanel();
+}
+
+function renderAddPanel() {
+  const panel = document.getElementById('add-panel');
+  const grid  = document.getElementById('add-cards-grid');
+  if (!editMode) { panel.classList.remove('open'); return; }
+  panel.classList.add('open');
+  grid.innerHTML = '';
+  yetkiliKartlar().forEach(k => {
+    const var_ = aktifKartlar.includes(k.id);
+    const el = document.createElement('div');
+    el.className = 'add-card' + (var_ ? ' added' : '');
+    el.innerHTML = `<span>${k.icon}</span><span>${k.title}</span>`;
+    if (!var_) el.onclick = () => kartEkle(k.id);
+    grid.appendChild(el);
+  });
+}
+
+function kartEkle(id) { if (!aktifKartlar.includes(id)) { aktifKartlar.push(id); tercihKaydet(); render(); } }
+function kartSil(id)  { aktifKartlar = aktifKartlar.filter(x=>x!==id); tercihKaydet(); render(); }
+
+function toggleEdit() {
+  editMode = !editMode;
+  const btn = document.getElementById('edit-btn');
+  btn.classList.toggle('active', editMode);
+  btn.textContent = editMode ? '✓ Bitti' : '✎ Düzenle';
+  render();
+}
+
+function setupDrag(el) {
+  el.draggable = true;
+  el.addEventListener('dragstart', e => { dragSrc=el; el.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+  el.addEventListener('dragend',   () => { el.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(e=>e.classList.remove('drag-over')); });
+  el.addEventListener('dragover',  e => { e.preventDefault(); if(el!==dragSrc) el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('drag-over');
+    if (dragSrc && dragSrc !== el) {
+      const si=aktifKartlar.indexOf(dragSrc.dataset.id), di=aktifKartlar.indexOf(el.dataset.id);
+      aktifKartlar.splice(si,1); aktifKartlar.splice(di,0,dragSrc.dataset.id);
+      tercihKaydet(); render();
+    }
+  });
+}
+
+// ── SAYFA YÜKLE ──────────────────────────────────────────────
+(async () => {
+  const [k, r, y] = await Promise.all([
+    fetch('/api/kullanicilar').then(r=>r.json()),
+    fetch('/api/roller').then(r=>r.json()),
+    fetch('/api/yetkiler').then(r=>r.json())
+  ]);
+  document.getElementById('s-kullanici').textContent = k.length;
+  document.getElementById('s-rol').textContent = r.length;
+  document.getElementById('s-yetki').textContent = y.length;
+  const map = {};
+  y.forEach(v => map[v.YetkiID] = v.YetkiAdi);
+  document.querySelectorAll('.yetki-item').forEach(el => {
+    const id = el.querySelector('.mono').textContent.trim();
+    const nameEl = el.querySelector(`#yn-${id}`);
+    if (map[id] && nameEl) nameEl.textContent = map[id];
+  });
+
+  await tercihYukle();
+
+  // Tablo bilgilerini arka planda yükle
+  if (ROL_TABLOLARI.length) tabloInfoYukle();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% set active = "tablo-goruntule" %}
+{% block title %}Tablo Görüntüle — DataPortal{% endblock %}
+{% block extra_style %}
+.tbl-select-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:20px; }
+.tbl-btn { padding:12px 14px; background:var(--surface2); border:1px solid var(--border2); border-radius:10px; color:var(--text); font-family:'DM Mono',monospace; font-size:0.82rem; cursor:pointer; text-align:left; transition:all 0.2s; }
+.tbl-btn:hover  { border-color:var(--accent2); color:var(--accent2); }
+.tbl-btn.active { border-color:var(--accent);  background:rgba(110,231,183,0.07); color:var(--accent); }
+.data-table-wrap { overflow-x:auto; max-height:520px; overflow-y:auto; }
+.data-table-wrap table { min-width:600px; }
+.data-table-wrap thead { position:sticky; top:0; background:var(--surface); z-index:2; }
+.stat-row { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
+.stat-chip { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:0.82rem; }
+.stat-chip strong { color:var(--accent); }
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>⊞ Tablo Görüntüle</h1>
+  <p>Yetkili olduğunuz tablolardaki verileri önizleyin ve indirin</p>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header" style="margin-bottom:12px;">
+    <h2>Tablo Seçin</h2>
+    <input id="tbl-search" placeholder="🔍 Ara..." style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:var(--text);font-family:inherit;font-size:0.85rem;outline:none;width:200px;" oninput="filterTbls(this.value)">
+  </div>
+  <div class="tbl-select-grid" id="tbl-grid">
+    {% for t in tables %}
+    <button class="tbl-btn" data-name="{{ t }}" onclick="loadTable('{{ t }}')">{{ t }}</button>
+    {% endfor %}
+    {% if not tables %}
+    <div style="color:var(--muted);font-size:0.85rem;grid-column:1/-1;padding:20px 0;">Yetkili tablo bulunamadı.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div id="data-panel" style="display:none;">
+  <div class="card">
+    <div class="card-header">
+      <h2 id="panel-title">—</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="refreshTable()">↻ Yenile</button>
+        <button class="btn btn-primary btn-sm" onclick="exportTable()">⬇ Excel İndir</button>
+      </div>
+    </div>
+    <div class="stat-row" id="stat-row"></div>
+    <div class="data-table-wrap">
+      <table id="data-table">
+        <thead id="data-thead"></thead>
+        <tbody id="data-tbody"></tbody>
+      </table>
+    </div>
+    <div id="data-empty" style="display:none;" class="empty"><div class="empty-icon">⊡</div>Bu tabloda veri yok</div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentTable = null;
+
+function filterTbls(q) {
+  document.querySelectorAll('.tbl-btn').forEach(b =>
+    b.style.display = b.dataset.name.toLowerCase().includes(q.toLowerCase()) ? '' : 'none');
+}
+
+async function loadTable(name) {
+  currentTable = name;
+  document.querySelectorAll('.tbl-btn').forEach(b => b.classList.toggle('active', b.dataset.name === name));
+  document.getElementById('panel-title').textContent = name;
+  document.getElementById('data-panel').style.display = 'block';
+  document.getElementById('data-tbody').innerHTML = '<tr><td colspan="99" style="text-align:center;color:var(--muted);padding:24px;">Yükleniyor...</td></tr>';
+
+  const r = await api(`/api/tablo-data/${name}`);
+  if (!r.ok) { toast(r.msg || 'Hata', 'error'); return; }
+
+  // İstatistik satırı
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-chip">Toplam Satır: <strong>${r.total}</strong></div>
+    <div class="stat-chip">Gösterilen: <strong>${r.rows.length}</strong></div>
+    <div class="stat-chip">Sütun: <strong>${r.columns.length}</strong></div>
+    ${r.total > 100 ? '<div class="stat-chip" style="color:var(--warn);">⚠ İlk 100 satır gösteriliyor</div>' : ''}`;
+
+  // Başlık
+  document.getElementById('data-thead').innerHTML =
+    '<tr>' + r.columns.map(c => `<th>${escHtml(c)}</th>`).join('') + '</tr>';
+
+  // Satırlar
+  const empty = document.getElementById('data-empty');
+  if (!r.rows.length) {
+    document.getElementById('data-tbody').innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  document.getElementById('data-tbody').innerHTML = r.rows.map(row =>
+    '<tr>' + r.columns.map(c => `<td>${escHtml(row[c] ?? '—')}</td>`).join('') + '</tr>'
+  ).join('');
+}
+
+function refreshTable() { if (currentTable) loadTable(currentTable); }
+
+function exportTable() {
+  if (!currentTable) return;
+  window.location = `/api/tablo-export/${currentTable}`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+{% endblock %}

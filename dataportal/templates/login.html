@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giriş — DataPortal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0d0f;--surface:#17171a;--surface2:#1f1f24;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --accent:#6ee7b7;--accent2:#38bdf8;
+  --text:#e8e8ed;--muted:rgba(232,232,237,0.45);--danger:#f87171;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;opacity:.25;}
+.orb1{width:400px;height:400px;background:var(--accent);top:-100px;right:-100px;}
+.orb2{width:300px;height:300px;background:var(--accent2);bottom:-80px;left:-80px;}
+.wrap{position:relative;z-index:10;width:100%;max-width:460px;padding:20px;}
+.logo{text-align:center;margin-bottom:36px;}
+.logo-icon{font-size:2.5rem;margin-bottom:8px;}
+.logo h1{font-size:1.5rem;font-weight:700;letter-spacing:-.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo p{color:var(--muted);font-size:.85rem;margin-top:4px;}
+.card{background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:32px;}
+.step{display:none;}.step.active{display:block;}
+.step-title{font-size:1rem;font-weight:700;margin-bottom:6px;}
+.step-sub{color:var(--muted);font-size:.83rem;margin-bottom:24px;}
+.field{margin-bottom:14px;}
+.field label{display:block;color:var(--muted);font-size:.73rem;font-weight:600;letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase;}
+.field input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:11px 14px;color:var(--text);font-family:inherit;font-size:.9rem;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent);}
+.field input::placeholder{color:var(--muted);}
+.row2{display:grid;grid-template-columns:2fr 1fr;gap:10px;}
+.btn{width:100%;padding:12px;border-radius:9px;border:none;font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;transition:all .25s;margin-top:6px;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0b1a12;}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(110,231,183,.3);}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border2);margin-top:4px;}
+.btn-ghost:hover{border-color:var(--accent2);color:var(--accent2);}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;}
+.err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:10px 14px;font-size:.83rem;color:var(--danger);margin-top:14px;display:none;}
+.ok-badge{background:rgba(110,231,183,.1);border:1px solid rgba(110,231,183,.25);border-radius:8px;padding:10px 14px;font-size:.83rem;color:var(--accent);margin-bottom:16px;display:none;}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.2);border-top-color:#0b1a12;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* PROFİL */
+.profile-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.profile-bar span{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.icon-btn{background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:5px 12px;color:var(--muted);font-size:.8rem;cursor:pointer;transition:all .2s;}
+.icon-btn:hover{color:var(--text);border-color:var(--accent2);}
+.profile-list{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.profile-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;cursor:pointer;transition:all .2s;}
+.profile-item:hover{border-color:var(--accent);}
+.profile-item.sel{border-color:var(--accent);background:rgba(110,231,183,.05);}
+.p-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);flex-shrink:0;}
+.profile-item.sel .p-dot{background:var(--accent);}
+.p-name{font-size:.88rem;font-weight:600;flex:1;}
+.p-detail{font-size:.74rem;color:var(--muted);font-family:'DM Mono',monospace;}
+.p-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;padding:2px 6px;border-radius:4px;transition:color .2s;}
+.p-del:hover{color:var(--danger);}
+.no-profile{text-align:center;padding:16px;color:var(--muted);font-size:.83rem;border:1px dashed var(--border2);border-radius:10px;margin-bottom:16px;}
+.save-box{display:none;margin-bottom:12px;padding:14px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;}
+.divider{display:flex;align-items:center;gap:10px;margin:16px 0;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border2);}
+.divider span{font-size:.73rem;color:var(--muted);white-space:nowrap;}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div><div class="orb orb2"></div>
+<div class="wrap">
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    <h1>DataPortal</h1>
+    <p>Veri Yönetim Sistemi</p>
+  </div>
+  <div class="card">
+
+    <!-- ADIM 1: DB Bağlantı -->
+    <div class="step active" id="step1">
+      <div class="step-title">Veritabanı Bağlantısı</div>
+      <div class="step-sub">Kayıtlı bir profil seçin veya bilgileri girin</div>
+
+      <div class="profile-bar">
+        <span>Kayıtlı Profiller</span>
+        <button class="icon-btn" onclick="showSave()">＋ Profil Kaydet</button>
+      </div>
+      <div id="plist"></div>
+
+      <!-- Kaydet formu -->
+      <div class="save-box" id="save-box">
+        <div class="field" style="margin-bottom:10px;">
+          <label>Profil Adı</label>
+          <input id="pname" placeholder="Örn: Üretim DB, Test DB…">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" style="margin-top:0;padding:8px 16px;font-size:.83rem;" onclick="saveProfile()">Kaydet</button>
+          <button class="btn btn-ghost"   style="margin-top:0;padding:8px 16px;font-size:.83rem;" onclick="hideSave()">İptal</button>
+        </div>
+      </div>
+
+      <div class="divider"><span>bağlantı bilgileri</span></div>
+
+      <div class="row2">
+        <div class="field"><label>Host</label><input id="host" value="localhost" placeholder="localhost"></div>
+        <div class="field"><label>Port</label><input id="port" value="3306" placeholder="3306"></div>
+      </div>
+      <div class="field"><label>Kullanıcı Adı</label><input id="db_user" placeholder="root"></div>
+      <div class="field"><label>Şifre</label><input id="db_pass" type="password" placeholder="••••••••"></div>
+      <div class="field"><label>Veritabanı</label><input id="db_name" placeholder="dataportal"></div>
+
+      <div class="err" id="err1"></div>
+      <button class="btn btn-primary" onclick="connect()"><span id="conn_lbl">Bağlan →</span></button>
+    </div>
+
+    <!-- ADIM 2: Kullanıcı -->
+    <div class="step" id="step2">
+      <div class="ok-badge" id="conn_ok">✓ Veritabanına bağlandı</div>
+      <div class="step-title">Kullanıcı Girişi</div>
+      <div class="step-sub">Sistem hesabınızla giriş yapın</div>
+      <div class="field"><label>Kullanıcı Adı</label><input id="username" placeholder="selim.kilic" autocomplete="username"></div>
+      <div class="field"><label>Şifre</label><input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+      <div class="err" id="err2"></div>
+      <button class="btn btn-primary" onclick="doLogin()"><span id="login_lbl">Giriş Yap</span></button>
+      <button class="btn btn-ghost" onclick="goBack()">← Geri</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const LS = 'dp_profiles';
+function getP(){ try{ return JSON.parse(localStorage.getItem(LS)||'[]'); }catch{ return []; } }
+function setP(l){ localStorage.setItem(LS, JSON.stringify(l)); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderProfiles(){
+  const list = getP();
+  const el   = document.getElementById('plist');
+  if(!list.length){ el.innerHTML='<div class="no-profile">Henüz kayıtlı profil yok</div>'; return; }
+  el.innerHTML='';
+  list.forEach((p,i)=>{
+    const d = document.createElement('div');
+    d.className='profile-item';
+    d.innerHTML=`<div class="p-dot"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="p-name">${esc(p.name)}</div>
+        <div class="p-detail">${esc(p.user)}@${esc(p.host)}:${esc(p.port)} / ${esc(p.database)}</div>
+      </div>
+      <button class="p-del" onclick="delP(${i},event)">✕</button>`;
+    d.addEventListener('click', ()=>loadP(i));
+    el.appendChild(d);
+  });
+}
+
+function loadP(i){
+  const p=getP()[i]; if(!p) return;
+  document.getElementById('host').value=p.host;
+  document.getElementById('port').value=p.port;
+  document.getElementById('db_user').value=p.user;
+  document.getElementById('db_name').value=p.database;
+  document.getElementById('db_pass').focus();
+  document.querySelectorAll('.profile-item').forEach((el,idx)=>el.classList.toggle('sel',idx===i));
+}
+
+function delP(i,e){
+  e.stopPropagation();
+  const l=getP(); l.splice(i,1); setP(l); renderProfiles();
+}
+
+function showSave(){ document.getElementById('save-box').style.display='block'; document.getElementById('pname').focus(); }
+function hideSave(){ document.getElementById('save-box').style.display='none'; document.getElementById('pname').value=''; }
+
+function saveProfile(){
+  const name=document.getElementById('pname').value.trim();
+  if(!name){ document.getElementById('pname').focus(); return; }
+  const p={ name,
+    host:    document.getElementById('host').value.trim()||'localhost',
+    port:    document.getElementById('port').value.trim()||'3306',
+    user:    document.getElementById('db_user').value.trim(),
+    database:document.getElementById('db_name').value.trim()
+  };
+  const l=getP(); const idx=l.findIndex(x=>x.name===name);
+  if(idx>=0) l[idx]=p; else l.push(p);
+  setP(l); hideSave(); renderProfiles();
+}
+
+function getCsrf(){ return document.cookie.match(/csrf_[^=]+=([^;]+)/)?.[1]||''; }
+
+async function connect(){
+  const btn=document.querySelector('#step1 .btn-primary');
+  const err=document.getElementById('err1');
+  btn.disabled=true;
+  document.getElementById('conn_lbl').innerHTML='<span class="spinner"></span>Bağlanıyor...';
+  err.style.display='none';
+  const r=await fetch('/api/connect',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRF-Token':getCsrf()},
+    body:JSON.stringify({
+      host:document.getElementById('host').value,
+      port:document.getElementById('port').value,
+      user:document.getElementById('db_user').value,
+      password:document.getElementById('db_pass').value,
+      database:document.getElementById('db_name').value
+    })
+  }).then(r=>r.json());
+  btn.disabled=false;
+  document.getElementById('conn_lbl').textContent='Bağlan →';
+  if(r.ok){
+    document.getElementById('step1').classList.remove('active');
+    document.getElementById('step2').classList.add('active');
+    document.getElementById('conn_ok').style.display='block';
+    document.getElementById('username').focus();
+  } else { err.textContent=r.msg; err.style.display='block'; }
+}
+
+async function doLogin(){
+  const btn=document.querySelector('#step2 .btn-primary');
+  const err=document.getElementById('err2');
+  btn.disabled=true;
+  document.getElementById('login_lbl').innerHTML='<span class="spinner"></span>Giriş yapılıyor...';
+  err.style.display='none';
+  const r=await fetch('/api/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      username:document.getElementById('username').value,
+      password:document.getElementById('password').value
+    })
+  }).then(r=>r.json());
+  btn.disabled=false;
+  document.getElementById('login_lbl').textContent='Giriş Yap';
+  if(r.ok){ window.location='/dashboard'; }
+  else { err.textContent=r.msg; err.style.display='block'; }
+}
+
+function goBack(){
+  document.getElementById('step2').classList.remove('active');
+  document.getElementById('step1').classList.add('active');
+  document.getElementById('conn_ok').style.display='none';
+}
+
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Enter') return;
+  if(document.getElementById('save-box').style.display!=='none'){ saveProfile(); return; }
+  if(document.getElementById('step1').classList.contains('active')) connect();
+  else doLogin();
+});
+
+renderProfiles();
+</script>
+</body>
+</html>

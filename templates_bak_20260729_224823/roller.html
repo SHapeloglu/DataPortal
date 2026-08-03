@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% set active = "roller" %}
+{% block title %}Roller — DataPortal{% endblock %}
+
+{% block extra_style %}
+.yetki-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.modal { width: 560px; max-height: 88vh; overflow-y: auto; }
+.yetki-check {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--bg);
+  border: 1px solid var(--border2); border-radius: 8px;
+  cursor: pointer; transition: all 0.2s;
+}
+.yetki-check:hover { border-color: var(--accent); }
+.yetki-check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink:0; }
+.yetki-check span { font-size: 0.83rem; }
+.yetki-check.has-sub { flex-direction: column; align-items: flex-start; gap: 0; padding: 0; border:none; background:none; cursor:default; }
+.yetki-check.has-sub .top-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; width:100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; transition: all 0.2s; cursor:pointer; }
+.yetki-check.has-sub .top-row:hover { border-color: var(--accent); }
+.yetki-check.has-sub.checked .top-row { border-color: rgba(110,231,183,0.35); background: rgba(110,231,183,0.05); }
+.table-panel {
+  display: none; margin-top: 6px; padding: 12px; width: 100%;
+  background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.2);
+  border-radius: 8px;
+}
+.table-panel.open { display: block; }
+.table-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.table-panel-title { font-size: 0.75rem; color: var(--accent2); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+.sel-all-btn { font-size: 0.72rem; color: var(--accent2); background: none; border: none; cursor: pointer; padding: 2px 8px; border-radius: 4px; }
+.sel-all-btn:hover { background: rgba(56,189,248,0.15); }
+.table-search-inp { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 6px; padding: 7px 10px; color: var(--text); font-family: inherit; font-size: 0.8rem; outline: none; margin-bottom: 8px; }
+.table-search-inp:focus { border-color: var(--accent2); }
+.table-check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; max-height: 200px; overflow-y: auto; padding-right: 2px; }
+.table-check-grid::-webkit-scrollbar { width: 4px; }
+.table-check-grid::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+.tbl-check { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+.tbl-check:hover { border-color: var(--accent2); }
+.tbl-check input { width: 13px; height: 13px; accent-color: var(--accent2); cursor: pointer; flex-shrink:0; }
+.tbl-check span { font-size: 0.78rem; font-family: 'DM Mono', monospace; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tinfo { margin-top: 7px; font-size: 0.75rem; color: var(--accent2); min-height: 16px; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Roller</h1>
+  <p>Rolleri ve yetkilerini yönetin</p>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Rol Listesi</h2>
+    <button class="btn btn-primary btn-sm" onclick="openAdd()">+ Yeni Rol</button>
+  </div>
+  <table>
+    <thead><tr><th>Rol ID</th><th>Rol Adı</th><th>Yetkiler</th><th>İşlemler</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none;"><div class="empty-icon">◐</div>Henüz rol yok</div>
+</div>
+
+<!-- EKLE MODAL -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <h3>+ Yeni Rol</h3>
+    <div class="field"><label>Rol Adı</label><input id="a-ad" placeholder="Örn: Editör"></div>
+    <div class="field"><label>Yetkiler</label>
+      <div class="yetki-grid" id="a-yetkiler"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add')">İptal</button>
+      <button class="btn btn-primary" onclick="ekle()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- DÜZENLE MODAL -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <h3>Rolü Düzenle</h3>
+    <input type="hidden" id="e-id">
+    <div class="field"><label>Rol Adı</label><input id="e-ad"></div>
+    <div class="field"><label>Yetkiler</label>
+      <div class="yetki-grid" id="e-yetkiler"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit')">İptal</button>
+      <button class="btn btn-primary" onclick="guncelle()">Güncelle</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TABLO_YUKLEME_ID = 'Y000004';
+let tumYetkiler = [];
+let tumTablolar = [];
+
+function buildYetkiCheckboxes(prefix, seciliYetkiler=[], seciliTablolar=[]) {
+  const containerId = prefix + '-yetkiler';
+  const el = document.getElementById(containerId);
+  el.innerHTML = tumYetkiler.map(y => {
+    const checked = seciliYetkiler.includes(y.YetkiID);
+    if (y.YetkiID === TABLO_YUKLEME_ID) {
+      return `
+        <label class="yetki-check has-sub ${checked ? 'checked' : ''}" id="lbl-${prefix}-${y.YetkiID}">
+          <div class="top-row">
+            <input type="checkbox" value="${y.YetkiID}" ${checked ? 'checked' : ''}
+              onchange="onTabloyukle(this,'${prefix}')">
+            <span>${y.YetkiAdi}</span>
+          </div>
+          <div class="table-panel ${checked ? 'open' : ''}" id="tpanel-${prefix}">
+            <div class="table-panel-header">
+              <span class="table-panel-title">📋 Erişilebilir Tablolar</span>
+              <button class="sel-all-btn" type="button" onclick="toggleAll('${prefix}')">Tümünü Seç / Kaldır</button>
+            </div>
+            <input class="table-search-inp" placeholder="🔍 Tablo ara..." oninput="filterTbls('${prefix}',this.value)">
+            <div class="table-check-grid" id="tgrid-${prefix}"></div>
+            <div class="tinfo" id="tinfo-${prefix}"></div>
+          </div>
+        </label>`;
+    }
+    return `
+      <label class="yetki-check">
+        <input type="checkbox" value="${y.YetkiID}" ${checked ? 'checked' : ''}>
+        <span>${y.YetkiAdi}</span>
+      </label>`;
+  }).join('');
+
+  buildTableGrid(prefix, seciliTablolar);
+}
+
+function buildTableGrid(prefix, secili=[]) {
+  const grid = document.getElementById('tgrid-' + prefix);
+  if (!grid) return;
+  if (tumTablolar.length === 0) {
+    grid.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;grid-column:1/-1;">Veritabanında tablo bulunamadı.</span>';
+    return;
+  }
+  grid.innerHTML = tumTablolar.map(t => `
+    <label class="tbl-check" data-name="${t}">
+      <input type="checkbox" value="${t}" ${secili.includes(t) ? 'checked' : ''}
+        onchange="updateInfo('${prefix}')">
+      <span title="${t}">${t}</span>
+    </label>`).join('');
+  updateInfo(prefix);
+}
+
+function filterTbls(prefix, q) {
+  document.querySelectorAll(`#tgrid-${prefix} .tbl-check`).forEach(el => {
+    el.style.display = el.dataset.name.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+function toggleAll(prefix) {
+  const inputs = [...document.querySelectorAll(`#tgrid-${prefix} .tbl-check:not([style*="none"]) input`)];
+  const allOn = inputs.every(i => i.checked);
+  inputs.forEach(i => i.checked = !allOn);
+  updateInfo(prefix);
+}
+
+function updateInfo(prefix) {
+  const n = document.querySelectorAll(`#tgrid-${prefix} input:checked`).length;
+  const el = document.getElementById('tinfo-' + prefix);
+  if (el) el.textContent = n > 0 ? `${n} tablo seçildi` : '';
+}
+
+function onTabloyukle(cb, prefix) {
+  const panel = document.getElementById('tpanel-' + prefix);
+  const lbl = document.getElementById(`lbl-${prefix}-${TABLO_YUKLEME_ID}`);
+  panel.classList.toggle('open', cb.checked);
+  lbl.classList.toggle('checked', cb.checked);
+  if (!cb.checked) {
+    document.querySelectorAll(`#tgrid-${prefix} input`).forEach(i => i.checked = false);
+    updateInfo(prefix);
+  }
+}
+
+function getCheckedYetkiler(prefix) {
+  // Sadece üst seviye yetki checkbox'ları — tgrid içindeki tablo checkbox'ları hariç
+  const container = document.getElementById(`${prefix}-yetkiler`);
+  const results = [];
+  container.querySelectorAll('input[type=checkbox]:checked').forEach(i => {
+    // tgrid içinde değilse yetki checkbox'ıdır
+    if (!i.closest(`#tgrid-${prefix}`)) {
+      results.push(i.value);
+    }
+  });
+  return results;
+}
+
+function getCheckedTablolar(prefix) {
+  return [...document.querySelectorAll(`#tgrid-${prefix} input:checked`)].map(i => i.value);
+}
+
+async function load() {
+  const [yetkiData, tblData] = await Promise.all([
+    fetch('/api/yetkiler/all').then(r => r.json()),
+    fetch('/api/tables/all').then(r => r.json())
+  ]);
+  tumYetkiler = yetkiData;
+  tumTablolar = tblData.tables || [];
+
+  buildYetkiCheckboxes('a', [], []);
+
+  const data = await api('/api/roller');
+  document.getElementById('empty').style.display = data.length ? 'none' : 'block';
+  document.getElementById('tbody').innerHTML = data.map(r => `
+    <tr>
+      <td><span class="mono">${r.RolID}</span></td>
+      <td><strong>${r.RolAdi}</strong></td>
+      <td><div class="yetki-tags">${(r.yetkiler||[]).map(y =>
+        `<span class="badge ${y.YetkiID===TABLO_YUKLEME_ID ? 'badge-blue' : 'badge-green'}">${y.YetkiAdi}</span>`
+      ).join('')}</div></td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick='editRow(${JSON.stringify(r)})'>Düzenle</button>
+        <button class="btn btn-danger btn-sm" onclick="silRol('${r.RolID}')">Sil</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openAdd() {
+  document.getElementById('a-ad').value = '';
+  buildYetkiCheckboxes('a', [], []);
+  openModal('modal-add');
+}
+
+function editRow(r) {
+  document.getElementById('e-id').value = r.RolID;
+  document.getElementById('e-ad').value = r.RolAdi;
+  const seciliYetkiler = (r.yetkiler||[]).map(y => y.YetkiID);
+  buildYetkiCheckboxes('e', seciliYetkiler, r.tablolar || []);
+  openModal('modal-edit');
+}
+
+async function ekle() {
+  const r = await api('/api/roller', 'POST', {
+    RolAdi: document.getElementById('a-ad').value,
+    yetkiler: getCheckedYetkiler('a'),
+    tablolar: getCheckedTablolar('a')
+  });
+  if (r.ok) { toast('Rol eklendi'); closeModal('modal-add'); load(); }
+  else toast(r.msg, 'error');
+}
+
+async function guncelle() {
+  const id = document.getElementById('e-id').value;
+  const r = await api(`/api/roller/${id}`, 'PUT', {
+    RolAdi: document.getElementById('e-ad').value,
+    yetkiler: getCheckedYetkiler('e'),
+    tablolar: getCheckedTablolar('e')
+  });
+  if (r.ok) { toast('Güncellendi'); closeModal('modal-edit'); load(); }
+  else toast(r.msg, 'error');
+}
+
+async function silRol(id) {
+  if (!confirm('Bu rolü silmek istediğinize emin misiniz?')) return;
+  const r = await api(`/api/roller/${id}`, 'DELETE');
+  if (r.ok) { toast('Silindi'); load(); }
+  else toast(r.msg, 'error');
+}
+
+load();
+</script>
+{% endblock %}

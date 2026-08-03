@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% set active = "tablo-konfig" %}
+{% block title %}Tablo Konfigürasyonu — DataPortal{% endblock %}
+
+{% block extra_style %}
+.field label{display:block;font-size:.73rem;color:var(--muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+.field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:.87rem;outline:none;transition:border-color .2s;}
+.field input:focus,.field select:focus{border-color:var(--accent);}
+select option{background:var(--surface);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.mod-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.72rem;font-weight:500;}
+.mod-truncate    {background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.2);}
+.mod-incremental {background:rgba(110,231,183,.12);color:var(--accent);border:1px solid rgba(110,231,183,.2);}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>⚙️ Tablo Konfigürasyonu</h1>
+  <p>Yükleme modu, SP çağrıları ve onay ayarları</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;">
+
+  <div class="card">
+    <div class="card-header" style="margin-bottom:14px;"><h2>Konfigürasyonlar</h2></div>
+    <table>
+      <thead><tr><th>Tablo</th><th>Mod</th><th>Before SP</th><th>After SP</th><th>Onay</th><th></th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none;"><div class="empty-icon">⚙️</div>Konfigürasyon yok</div>
+  </div>
+
+  <div class="card" style="position:sticky;top:20px;">
+    <div style="font-size:.9rem;font-weight:700;margin-bottom:16px;">➕ Yeni Konfigürasyon</div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Tablo Adı</label>
+      <input id="f-tablo" placeholder="mysql_tablo_adi">
+    </div>
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div class="field">
+        <label>Yükleme Modu</label>
+        <select id="f-mod" onchange="modDegis()">
+          <option value="truncate">Truncate + Insert</option>
+          <option value="incremental">Incremental</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Onay Gerekli</label>
+        <select id="f-onay">
+          <option value="1">Evet</option>
+          <option value="0">Hayır (Admin hariç)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:10px;" id="anahtar-row" style="display:none;">
+      <label>Artış Anahtarı (incremental için)</label>
+      <input id="f-anahtar" placeholder="id veya tarih_sutunu">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Before SP (isteğe bağlı)</label>
+      <input id="f-before" placeholder="sp_before_yukle">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>After SP (isteğe bağlı)</label>
+      <input id="f-after" placeholder="sp_after_yukle">
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label>Açıklama</label>
+      <input id="f-acik" placeholder="İsteğe bağlı…">
+    </div>
+    <button class="btn btn-primary" style="width:100%;" onclick="kaydet()">Kaydet</button>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function modDegis() {
+  const mod = document.getElementById('f-mod').value;
+  document.getElementById('anahtar-row').style.display = mod === 'incremental' ? '' : 'none';
+}
+
+async function yukle() {
+  const r  = await api('/api/tablo-konfig');
+  const tb = document.getElementById('tbody');
+  const em = document.getElementById('empty');
+  if(!r.ok || !r.konfig.length) { tb.innerHTML=''; em.style.display=''; return; }
+  em.style.display='none';
+  tb.innerHTML = r.konfig.map(k => `
+    <tr>
+      <td class="mono" style="font-size:.82rem;">${k.TabloAdi}</td>
+      <td><span class="mod-badge mod-${k.YukleModu}">${k.YukleModu}</span></td>
+      <td class="mono" style="font-size:.75rem;color:var(--muted);">${k.BeforeSP||'—'}</td>
+      <td class="mono" style="font-size:.75rem;color:var(--muted);">${k.AfterSP||'—'}</td>
+      <td style="text-align:center;">${k.OnayGerekli ? '✓' : '—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="sil(${k.KonfigID})" style="color:var(--danger)">✕</button></td>
+    </tr>`).join('');
+}
+
+async function kaydet() {
+  const r = await api('/api/tablo-konfig','POST',{
+    TabloAdi:     document.getElementById('f-tablo').value.trim(),
+    YukleModu:    document.getElementById('f-mod').value,
+    OnayGerekli:  document.getElementById('f-onay').value === '1',
+    ArtanAnahtar: document.getElementById('f-anahtar').value.trim() || null,
+    BeforeSP:     document.getElementById('f-before').value.trim() || null,
+    AfterSP:      document.getElementById('f-after').value.trim() || null,
+    Aciklama:     document.getElementById('f-acik').value.trim() || null,
+  });
+  if(r.ok){ toast(r.msg,'success'); yukle(); }
+  else toast(r.msg,'error');
+}
+
+async function sil(id) {
+  if(!confirm('Konfigürasyonu silmek istiyor musunuz?')) return;
+  const r = await api(`/api/tablo-konfig/${id}`,'DELETE');
+  if(r.ok){ toast(r.msg,'success'); yukle(); }
+  else toast(r.msg,'error');
+}
+
+modDegis();
+yukle();
+</script>
+{% endblock %}

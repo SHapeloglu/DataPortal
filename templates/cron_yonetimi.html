@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% set active = "cron-yonetimi" %}
+{% block title %}Cron Yönetimi — DataPortal{% endblock %}
+
+{% block extra_style %}
+.field label{display:block;font-size:.73rem;color:var(--muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+.field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:.87rem;outline:none;transition:border-color .2s;}
+.field input:focus,.field select:focus{border-color:var(--accent);}
+select option{background:var(--surface);}
+.durum-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:.72rem;font-weight:500;}
+.d-basarili  {background:rgba(110,231,183,.12);color:var(--accent); border:1px solid rgba(110,231,183,.2);}
+.d-hata      {background:rgba(248,113,113,.12);color:var(--danger); border:1px solid rgba(248,113,113,.2);}
+.d-calisiyor {background:rgba(251,191,36,.12); color:#fbbf24;       border:1px solid rgba(251,191,36,.2);}
+.cron-hint{font-size:.75rem;color:var(--muted);margin-top:4px;}
+.cron-hint code{background:var(--surface2);border-radius:3px;padding:1px 5px;font-size:.72rem;}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>⏰ Cron Yönetimi</h1>
+  <p>Periyodik SP görevlerini tanımlayın ve izleyin</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;">
+
+  <div class="card">
+    <div class="card-header" style="margin-bottom:14px;">
+      <h2>Görevler</h2>
+      <button class="btn btn-ghost btn-sm" onclick="yukle()">↻ Yenile</button>
+    </div>
+    <table>
+      <thead><tr><th>Görev</th><th>SP</th><th>Cron</th><th>Son Çalışma</th><th>Durum</th><th>Aktif</th><th></th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none;"><div class="empty-icon">⏰</div>Görev tanımlanmamış</div>
+  </div>
+
+  <div class="card" style="position:sticky;top:20px;">
+    <div style="font-size:.9rem;font-weight:700;margin-bottom:16px;">➕ Yeni Görev</div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Görev Adı</label>
+      <input id="f-adi" placeholder="Örn: Günlük Satış Özeti">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>SP Adı</label>
+      <input id="f-sp" placeholder="sp_gunluk_ozet" class="mono">
+    </div>
+    <div class="field" style="margin-bottom:4px;">
+      <label>Cron İfadesi</label>
+      <input id="f-cron" placeholder="0 8 * * *" class="mono">
+    </div>
+    <div class="cron-hint">
+      <code>0 8 * * *</code> her gün 08:00 &nbsp;
+      <code>0 */2 * * *</code> her 2 saatte &nbsp;
+      <code>0 9 * * 1</code> her Pazartesi
+    </div>
+    <div class="field" style="margin-top:12px;margin-bottom:14px;">
+      <label>Aktif</label>
+      <select id="f-aktif">
+        <option value="1">Evet</option>
+        <option value="0">Hayır</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" style="width:100%;" onclick="kaydet()">Kaydet</button>
+  </div>
+
+</div>
+
+<!-- Mesaj modal -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:500px;width:90%;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <strong>Son Çalışma Mesajı</strong>
+      <button onclick="document.getElementById('modal').style.display='none'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;">✕</button>
+    </div>
+    <pre id="modal-msg" style="font-size:.8rem;background:var(--bg);border-radius:8px;padding:12px;white-space:pre-wrap;color:var(--text);max-height:200px;overflow-y:auto;"></pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function yukle() {
+  const r  = await api('/api/cron-gorevler');
+  const tb = document.getElementById('tbody');
+  const em = document.getElementById('empty');
+  if(!r.ok || !r.gorevler.length) { tb.innerHTML=''; em.style.display=''; return; }
+  em.style.display='none';
+  tb.innerHTML = r.gorevler.map(g => `
+    <tr>
+      <td style="font-weight:500;">${esc(g.GorevAdi)}</td>
+      <td class="mono" style="font-size:.75rem;">${esc(g.SpAdi)}</td>
+      <td class="mono" style="font-size:.75rem;color:var(--muted);">${esc(g.CronIfade)}</td>
+      <td style="font-size:.75rem;color:var(--muted);white-space:nowrap;">${(g.SonCalisma||'—').toString().slice(0,16)}</td>
+      <td>
+        ${g.SonDurum
+          ? `<span class="durum-badge d-${g.SonDurum}" style="cursor:pointer;" onclick="mesajGoster('${esc(g.SonMesaj||'')}')">${g.SonDurum}</span>`
+          : '—'}
+      </td>
+      <td><input type="checkbox" ${g.Aktif?'checked':''} onchange="toggleAktif(${g.GorevID},this.checked)" style="accent-color:var(--accent)"></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" onclick="hemenCalistir(${g.GorevID})" title="Hemen Çalıştır">▶</button>
+        <button class="btn btn-ghost btn-sm" onclick="sil(${g.GorevID})" style="color:var(--danger)">✕</button>
+      </td>
+    </tr>`).join('');
+}
+
+function mesajGoster(msg) {
+  document.getElementById('modal-msg').textContent = msg || '—';
+  document.getElementById('modal').style.display = 'flex';
+}
+
+async function kaydet() {
+  const r = await api('/api/cron-gorevler','POST',{
+    GorevAdi:  document.getElementById('f-adi').value.trim(),
+    SpAdi:     document.getElementById('f-sp').value.trim(),
+    CronIfade: document.getElementById('f-cron').value.trim(),
+    Aktif:     document.getElementById('f-aktif').value === '1'
+  });
+  if(r.ok){ toast(r.msg,'success'); yukle(); }
+  else toast(r.msg,'error');
+}
+
+async function toggleAktif(id, aktif) {
+  const g = (await api('/api/cron-gorevler')).gorevler?.find(x => x.GorevID === id);
+  if(!g) return;
+  await api(`/api/cron-gorevler/${id}`,'PUT',{...g, Aktif: aktif});
+  yukle();
+}
+
+async function hemenCalistir(id) {
+  const r = await api(`/api/cron-gorevler/${id}/calistir`,'POST',{});
+  toast(r.msg, r.ok ? 'success' : 'error');
+  setTimeout(yukle, 2000);
+}
+
+async function sil(id) {
+  if(!confirm('Görevi silmek istiyor musunuz?')) return;
+  const r = await api(`/api/cron-gorevler/${id}`,'DELETE');
+  if(r.ok){ toast(r.msg,'success'); yukle(); }
+  else toast(r.msg,'error');
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+yukle();
+</script>
+{% endblock %}

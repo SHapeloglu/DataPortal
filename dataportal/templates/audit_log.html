@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% set active = "audit-log" %}
+{% block title %}Audit Log — DataPortal{% endblock %}
+
+{% block extra_style %}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.filters input,.filters select{background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:inherit;font-size:.85rem;outline:none;transition:border-color .2s;}
+.filters input:focus,.filters select:focus{border-color:var(--accent);}
+.filters input::placeholder{color:var(--muted);}
+select option{background:var(--surface);}
+.action-badge{display:inline-block;padding:2px 9px;border-radius:6px;font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500;white-space:nowrap;}
+.act-login   {background:rgba(110,231,183,.12);color:var(--accent); border:1px solid rgba(110,231,183,.2);}
+.act-logout  {background:rgba(232,232,237,.07);color:var(--muted);  border:1px solid var(--border2);}
+.act-table   {background:rgba(56,189,248,.12); color:var(--accent2);border:1px solid rgba(56,189,248,.2);}
+.act-user    {background:rgba(244,114,182,.12);color:#f472b6;       border:1px solid rgba(244,114,182,.2);}
+.act-role    {background:rgba(251,191,36,.12); color:#fbbf24;       border:1px solid rgba(251,191,36,.2);}
+.act-password{background:rgba(248,113,113,.12);color:var(--danger); border:1px solid rgba(248,113,113,.2);}
+.act-default {background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.ip-cell{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--muted);}
+.detail-cell{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.83rem;}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+.stat-card .val{font-size:1.6rem;font-weight:700;line-height:1;}
+.stat-card .lbl{font-size:.7rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.8px;}
+#loader{display:none;text-align:center;padding:40px;color:var(--muted);font-size:.88rem;}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.time-cell{white-space:nowrap;font-size:.82rem;}
+.time-cell .dp{color:var(--muted);}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>📋 Audit Log</h1>
+  <p>Sistemdeki kritik işlemlerin kaydı — son 200 olay</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="val" id="s-total">—</div><div class="lbl">Toplam</div></div>
+  <div class="stat-card"><div class="val" style="color:var(--accent)"  id="s-login">—</div><div class="lbl">Giriş</div></div>
+  <div class="stat-card"><div class="val" style="color:var(--accent2)" id="s-table">—</div><div class="lbl">Tablo İşlemi</div></div>
+  <div class="stat-card"><div class="val" style="color:#f472b6"        id="s-user">—</div><div class="lbl">Kullanıcı</div></div>
+  <div class="stat-card"><div class="val" style="color:#fbbf24"        id="s-role">—</div><div class="lbl">Rol</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+    <h2>İşlem Kayıtları</h2>
+    <div class="filters">
+      <input id="f-user" placeholder="Kullanıcı ara…" oninput="applyFilters()" style="width:140px;">
+      <select id="f-action" onchange="applyFilters()">
+        <option value="">Tüm İşlemler</option>
+        <option>LOGIN</option><option>LOGOUT</option><option>PASSWORD_CHANGE</option>
+        <option>TABLE_CREATE</option><option>TABLE_LOAD</option><option>TABLE_DROP</option><option>TABLE_EXPORT</option>
+        <option>USER_CREATE</option><option>USER_UPDATE</option><option>USER_DELETE</option>
+        <option>ROLE_CREATE</option><option>ROLE_UPDATE</option><option>ROLE_DELETE</option>
+      </select>
+      <input id="f-date" type="date" onchange="applyFilters()" title="Tarihe göre filtrele">
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Temizle</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadLog()" id="rbtn">↻ Yenile</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ CSV</button>
+    </div>
+  </div>
+
+  <div id="loader"><span class="spin"></span>Yükleniyor…</div>
+  <div id="twrap">
+    <table>
+      <thead><tr><th>#</th><th>Kullanıcı</th><th>İşlem</th><th>Detay</th><th>IP</th><th>Tarih / Saat</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none;"><div class="empty-icon">📋</div>Gösterilecek kayıt yok</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allRows=[];
+
+function badgeClass(c){
+  if(!c) return 'act-default';
+  if(c==='LOGIN')             return 'act-login';
+  if(c==='LOGOUT')            return 'act-logout';
+  if(c.startsWith('TABLE_'))  return 'act-table';
+  if(c.startsWith('USER_'))   return 'act-user';
+  if(c.startsWith('ROLE_'))   return 'act-role';
+  if(c==='PASSWORD_CHANGE')   return 'act-password';
+  return 'act-default';
+}
+
+function fmtTime(r){
+  if(!r) return '—';
+  const p=r.split(' ');
+  return p.length===2?`<span class="dp">${p[0]}</span> ${p[1]}`:r;
+}
+
+function updateStats(rows){
+  document.getElementById('s-total').textContent=rows.length;
+  document.getElementById('s-login').textContent=rows.filter(r=>r.IslemKodu==='LOGIN').length;
+  document.getElementById('s-table').textContent=rows.filter(r=>r.IslemKodu&&r.IslemKodu.startsWith('TABLE_')).length;
+  document.getElementById('s-user').textContent =rows.filter(r=>r.IslemKodu&&r.IslemKodu.startsWith('USER_')).length;
+  document.getElementById('s-role').textContent =rows.filter(r=>r.IslemKodu&&r.IslemKodu.startsWith('ROLE_')).length;
+}
+
+function renderRows(rows){
+  const tb=document.getElementById('tbody');
+  const em=document.getElementById('empty');
+  if(!rows.length){ tb.innerHTML=''; em.style.display=''; return; }
+  em.style.display='none';
+  tb.innerHTML=rows.map(r=>`
+    <tr>
+      <td class="mono">${r.LogID}</td>
+      <td><strong>${r.KullaniciAdi||'<span style="color:var(--muted)">SYSTEM</span>'}</strong></td>
+      <td><span class="action-badge ${badgeClass(r.IslemKodu)}">${r.IslemKodu||'?'}</span></td>
+      <td class="detail-cell" title="${(r.Detay||'').replace(/"/g,'&quot;')}">${r.Detay||'—'}</td>
+      <td class="ip-cell">${r.IP||'—'}</td>
+      <td class="time-cell">${fmtTime(r.IslemTarihi)}</td>
+    </tr>`).join('');
+}
+
+function applyFilters(){
+  const fu=document.getElementById('f-user').value.toLowerCase().trim();
+  const fa=document.getElementById('f-action').value;
+  const fd=document.getElementById('f-date').value;
+  renderRows(allRows.filter(r=>{
+    if(fu&&!(r.KullaniciAdi||'').toLowerCase().includes(fu)) return false;
+    if(fa&&r.IslemKodu!==fa) return false;
+    if(fd&&!(r.IslemTarihi||'').startsWith(fd)) return false;
+    return true;
+  }));
+}
+
+function clearFilters(){
+  document.getElementById('f-user').value='';
+  document.getElementById('f-action').value='';
+  document.getElementById('f-date').value='';
+  renderRows(allRows);
+}
+
+function exportCSV(){
+  const h=['LogID','KullaniciAdi','IslemKodu','Detay','IP','IslemTarihi'];
+  const e=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const blob=new Blob(['\uFEFF'+[h.join(','),...allRows.map(r=>h.map(k=>e(r[k])).join(','))].join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`audit_log_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+async function loadLog(){
+  const loader=document.getElementById('loader');
+  const wrap=document.getElementById('twrap');
+  const btn=document.getElementById('rbtn');
+  loader.style.display=''; wrap.style.display='none'; btn.disabled=true; btn.textContent='…';
+  try{
+    const data=await api('/api/audit-log');
+    if(!data.ok){ toast(data.msg||'Log alınamadı.','error'); return; }
+    allRows=data.log||[];
+    updateStats(allRows);
+    applyFilters();
+  }catch(e){ toast('Bağlantı hatası.','error'); }
+  finally{ loader.style.display='none'; wrap.style.display=''; btn.disabled=false; btn.textContent='↻ Yenile'; }
+}
+
+loadLog();
+</script>
+{% endblock %}

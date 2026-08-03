@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+  # ── DataPortal Web Uygulaması ───────────────────────────────────────────
+  web:
+    build: .
+    ports:
+      - "5001:5000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-degistirin_bunu}
+      - FLASK_DEBUG=false
+      - HTTPS=false
+    volumes:
+      - ./uploads:/app/uploads         # Geçici yüklemeler için
+      - excel-dosyalar:/app/excel_store  # Onaylanan Excel versiyonları
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - dataportal-net
+
+  # ── MySQL Veritabanı ─────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-dataportal}
+      MYSQL_USER: ${DB_USER:-dpuser}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-dppass}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql          # Kalıcı veri
+      - ./migration.sql:/docker-entrypoint-initdb.d/init.sql  # Otomatik kurulum
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - dataportal-net
+
+volumes:
+  mysql-data:
+  excel-dosyalar:
+
+networks:
+  dataportal-net:
+    driver: bridge

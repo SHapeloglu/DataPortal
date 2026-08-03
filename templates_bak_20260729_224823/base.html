@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Sistem{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0d0f; --surface: #17171a; --surface2: #1f1f24;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+  --accent: #6ee7b7; --accent2: #38bdf8; --accent3: #f472b6;
+  --text: #e8e8ed; --muted: rgba(232,232,237,0.45);
+  --danger: #f87171; --warn: #fbbf24; --r: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+/* SIDEBAR */
+.sidebar { width: 230px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; z-index: 100; }
+.sidebar-logo { padding: 28px 22px 20px; border-bottom: 1px solid var(--border); }
+.sidebar-logo span { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.sidebar-logo small { display: block; color: var(--muted); font-size: 0.72rem; margin-top: 2px; }
+nav { padding: 16px 10px; flex: 1; overflow-y: auto; }
+nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 0.88rem; font-weight: 500; transition: all 0.2s; margin-bottom: 2px; }
+nav a:hover { background: var(--surface2); color: var(--text); }
+nav a.active { background: rgba(110,231,183,0.1); color: var(--accent); }
+nav a .ico { font-size: 1rem; width: 20px; text-align: center; }
+.nav-section { font-size: 0.68rem; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; padding: 14px 12px 6px; }
+.sidebar-footer { padding: 16px 10px; border-top: 1px solid var(--border); }
+.sidebar-footer .user-info { padding: 10px 12px; }
+.sidebar-footer .user-info strong { display: block; font-size: 0.85rem; }
+.sidebar-footer .user-info small { color: var(--muted); font-size: 0.75rem; }
+
+/* MAIN */
+.main { margin-left: 230px; flex: 1; padding: 32px; min-height: 100vh; }
+.page-header { margin-bottom: 28px; }
+.page-header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+.page-header p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 24px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.card-header h2 { font-size: 1rem; font-weight: 600; }
+
+/* TABLE */
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+thead th { color: var(--muted); font-size: 0.72rem; letter-spacing: 1px; text-transform: uppercase; padding: 0 14px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+tbody tr:hover { background: var(--surface2); }
+tbody td { padding: 12px 14px; }
+tbody tr:last-child { border-bottom: none; }
+
+/* BADGE */
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+.badge-green { background: rgba(110,231,183,0.12); color: var(--accent); border: 1px solid rgba(110,231,183,0.2); }
+.badge-blue  { background: rgba(56,189,248,0.12);  color: var(--accent2); border: 1px solid rgba(56,189,248,0.2); }
+.badge-pink  { background: rgba(244,114,182,0.12); color: var(--accent3); border: 1px solid rgba(244,114,182,0.2); }
+.badge-gray  { background: var(--surface2); color: var(--muted); border: 1px solid var(--border2); }
+
+/* BTN */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: none; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #0d1a14; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(110,231,183,0.3); }
+.btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger { background: rgba(248,113,113,0.1); color: var(--danger); border: 1px solid rgba(248,113,113,0.2); }
+.btn-danger:hover { background: rgba(248,113,113,0.2); }
+.btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+
+/* MODAL */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 28px; width: 480px; max-width: 95vw; animation: slideUp 0.25s ease; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+/* FORM */
+.field { margin-bottom: 16px; }
+.field label { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 7px; text-transform: uppercase; }
+.field input, .field select { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field input::placeholder { color: var(--muted); }
+.field .hint { font-size: 0.75rem; color: var(--muted); margin-top: 5px; }
+select option { background: var(--surface); }
+
+/* CHECKBOXES */
+.yetki-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.yetki-check { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+.yetki-check:hover { border-color: var(--accent); }
+.yetki-check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.yetki-check span { font-size: 0.83rem; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; padding: 12px 18px; font-size: 0.875rem; z-index: 9999; transform: translateY(80px); opacity: 0; transition: all 0.3s; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.success { border-color: rgba(110,231,183,0.3); color: var(--accent); }
+.toast.error   { border-color: rgba(248,113,113,0.3); color: var(--danger); }
+
+/* EMPTY */
+.empty { text-align: center; padding: 48px; color: var(--muted); font-size: 0.9rem; }
+.empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+/* MONO */
+.mono { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--accent2); }
+
+{% block extra_style %}{% endblock %}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <span>⬡ DataPortal</span>
+    <small>Veri Yönetim Sistemi</small>
+  </div>
+  <nav>
+    <div class="nav-section">Ana Menü</div>
+    <a href="/dashboard" class="{% if active=='dashboard' %}active{% endif %}">
+      <span class="ico">◈</span> Dashboard
+    </a>
+    {% if 'Y000007' in yetkiler or 'Y000008' in yetkiler or 'Y000009' in yetkiler %}
+    <div class="nav-section">ETL</div>
+    {% if 'Y000008' in yetkiler %}
+    <a href="/dosya-yukle" class="{% if active=='dosya-yukle' %}active{% endif %}">
+      <span class="ico">⬆</span> Dosya Yükle
+    </a>
+    {% endif %}
+    {% if 'Y000009' in yetkiler %}
+    <a href="/onay-bekleyenler" class="{% if active=='onay-bekleyenler' %}active{% endif %}">
+      <span class="ico">✅</span> Onay Bekleyenler
+    </a>
+    {% endif %}
+    <a href="/dosya-arsiv" class="{% if active=='dosya-arsiv' %}active{% endif %}">
+      <span class="ico">📦</span> Dosya Arşivi
+    </a>
+    {% if 'Y000007' in yetkiler %}
+    <a href="/dizin-yonetimi" class="{% if active=='dizin-yonetimi' %}active{% endif %}">
+      <span class="ico">📁</span> Dizin Yönetimi
+    </a>
+    {% endif %}
+    {% if 'Y000010' in yetkiler %}
+    <a href="/tablo-konfig" class="{% if active=='tablo-konfig' %}active{% endif %}">
+      <span class="ico">⚙</span> Tablo Konfigürasyonu
+    </a>
+    {% endif %}
+    {% if 'Y000011' in yetkiler %}
+    <a href="/kalite-kurallari" class="{% if active=='kalite-kurallari' %}active{% endif %}">
+      <span class="ico">🔍</span> Kalite Kuralları
+    </a>
+    {% endif %}
+    {% if 'Y000012' in yetkiler %}
+    <a href="/cron-yonetimi" class="{% if active=='cron-yonetimi' %}active{% endif %}">
+      <span class="ico">⏱</span> Cron Görevleri
+    </a>
+    {% endif %}
+    {% endif %}
+    {% if 'Y000003' in yetkiler %}
+    <a href="/excel-mysql-create" class="{% if active=='excel-create' %}active{% endif %}">
+      <span class="ico">⬛</span> Tablo Oluştur
+    </a>
+    {% endif %}
+    {% if 'Y000004' in yetkiler %}
+    <a href="/excel-mysql-load" class="{% if active=='excel-load' %}active{% endif %}">
+      <span class="ico">⬜</span> Veri Yükle
+    </a>
+    <a href="/tablo-goruntule" class="{% if active=='tablo-goruntule' %}active{% endif %}">
+      <span class="ico">⊞</span> Tablo Görüntüle
+    </a>
+    {% endif %}
+    {% if 'Y000005' in yetkiler %}
+    <a href="/tablo-sil" class="{% if active=='tablo-sil' %}active{% endif %}">
+      <span class="ico">✕</span> Tablo Sil
+    </a>
+    {% endif %}
+    <div class="nav-section">Yönetim</div>
+    {% if 'Y000008' in yetkiler %}
+    <a href="/dosya-yukle" class="{% if active=='dosya-yukle' %}active{% endif %}">
+      <span class="ico">📤</span> Dosya Yükle
+    </a>
+    <a href="/dosya-arsiv" class="{% if active=='dosya-arsiv' %}active{% endif %}">
+      <span class="ico">📦</span> Dosya Arşivi
+    </a>
+    {% endif %}
+    {% if 'Y000009' in yetkiler %}
+    <a href="/onay-bekleyenler" class="{% if active=='onay-bekleyenler' %}active{% endif %}">
+      <span class="ico">✅</span> Onay Bekleyenler
+    </a>
+    {% endif %}
+    {% if 'Y000007' in yetkiler %}
+    <a href="/dizin-yonetimi" class="{% if active=='dizin-yonetimi' %}active{% endif %}">
+      <span class="ico">📁</span> Dizin Yönetimi
+    </a>
+    {% endif %}
+    {% if 'Y000010' in yetkiler %}
+    <a href="/tablo-konfig" class="{% if active=='tablo-konfig' %}active{% endif %}">
+      <span class="ico">⚙️</span> Tablo Konfigürasyon
+    </a>
+    {% endif %}
+    {% if 'Y000011' in yetkiler %}
+    <a href="/kalite-kurallari" class="{% if active=='kalite-kurallari' %}active{% endif %}">
+      <span class="ico">🔍</span> Kalite Kuralları
+    </a>
+    {% endif %}
+    {% if 'Y000012' in yetkiler %}
+    <a href="/cron-yonetimi" class="{% if active=='cron-yonetimi' %}active{% endif %}">
+      <span class="ico">⏰</span> Cron Yönetimi
+    </a>
+    {% endif %}
+    {% if 'Y000001' in yetkiler %}
+    <a href="/kullanicilar" class="{% if active=='kullanicilar' %}active{% endif %}">
+      <span class="ico">◯</span> Kullanıcılar
+    </a>
+    <a href="/audit-log" class="{% if active=='audit-log' %}active{% endif %}">
+      <span class="ico">📋</span> Audit Log
+    </a>
+    {% endif %}
+    {% if 'Y000002' in yetkiler %}
+    <a href="/roller" class="{% if active=='roller' %}active{% endif %}">
+      <span class="ico">◐</span> Roller
+    </a>
+    <a href="/yetkiler" class="{% if active=='yetkiler' %}active{% endif %}">
+      <span class="ico">◑</span> Yetkiler
+    </a>
+    {% endif %}
+    <div class="nav-section">Hesap</div>
+    <a href="/sifre-degistir" class="{% if active=='sifre-degistir' %}active{% endif %}">
+      <span class="ico">🔑</span> Şifre Değiştir
+    </a>
+    <a href="/yardim" class="{% if active=='yardim' %}active{% endif %}">
+      <span class="ico">❓</span> Yardım
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <strong>{{ kullanici_adi }}</strong>
+      <small>Oturum aktif</small>
+    </div>
+    <a href="#" onclick="toggleNotif(event)" style="display:flex;align-items:center;gap:6px;padding:6px 12px;color:var(--muted);font-size:.82rem;text-decoration:none;transition:color .2s;" title="Bildirimler">
+      🔔 <span id="notif-badge" style="display:none;background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:.7rem;font-weight:700;">0</span>
+    </a>
+    <div id="notif-panel" style="display:none;position:absolute;bottom:80px;left:12px;right:12px;background:var(--surface);border:1px solid var(--border2);border-radius:12px;max-height:280px;overflow-y:auto;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.4);">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:.82rem;font-weight:600;">Bildirimler</span>
+        <button onclick="tumunuOku()" style="background:none;border:none;color:var(--accent);font-size:.75rem;cursor:pointer;">Tümünü okundu işaretle</button>
+      </div>
+      <div id="notif-list" style="padding:8px;"></div>
+    </div>
+    <a href="/logout" class="btn btn-danger btn-sm" style="margin: 6px 12px;">↪ Çıkış</a>
+  </div>
+</aside>
+
+<main class="main">
+{% block content %}{% endblock %}
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── CSRF TOKEN ─────────────────────────────────────────────────────────────
+   Şablon tarafından sunulan token'ı JavaScript'e aktarıyoruz.
+   Tüm state-değiştiren fetch isteklerine X-CSRF-Token header'ı ekliyoruz. */
+const CSRF_TOKEN = "{{ csrf_token }}";
+
+/* ── Bildirim sistemi ──────────────────────────────────────────────────────── */
+async function loadBildirimler() {
+  try {
+    const r = await api('/api/bildirimler');
+    if (!r.ok) return;
+    const badge = document.getElementById('notif-badge');
+    const list  = document.getElementById('notif-list');
+    if (r.okunmamis > 0) { badge.style.display='inline'; badge.textContent=r.okunmamis; }
+    else badge.style.display='none';
+    if (!list) return;
+    if (!r.bildirimler.length) { list.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:.82rem;">Bildirim yok</div>'; return; }
+    const tipIcon = {onay_bekliyor:'⏳',onaylandi:'✅',reddedildi:'❌',kalite_hatasi:'⚠️',cron_hata:'🔴',sistem:'ℹ️'};
+    list.innerHTML = r.bildirimler.map(b=>`
+      <div style="display:flex;gap:8px;padding:8px 6px;border-radius:7px;${!b.Okundu?'background:rgba(110,231,183,.04);':''}">
+        <span style="font-size:1rem;flex-shrink:0;">${tipIcon[b.Tip]||'📌'}</span>
+        <div>
+          <div style="font-size:.82rem;font-weight:${b.Okundu?'400':'600'};color:var(--text);">${b.Baslik}</div>
+          ${b.Mesaj?`<div style="font-size:.75rem;color:var(--muted);margin-top:2px;">${b.Mesaj}</div>`:''}
+          <div style="font-size:.7rem;color:var(--muted);margin-top:2px;">${b.Tarih}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+function toggleNotif(e) {
+  e.preventDefault();
+  const panel=document.getElementById('notif-panel');
+  const isOpen=panel.style.display!=='none';
+  panel.style.display=isOpen?'none':'block';
+  if(!isOpen) loadBildirimler();
+}
+async function tumunuOku() {
+  await api('/api/bildirimler/okundu','POST',{});
+  document.getElementById('notif-badge').style.display='none';
+  loadBildirimler();
+}
+loadBildirimler();
+setInterval(loadBildirimler,60000);
+document.addEventListener('click',e=>{
+  const panel=document.getElementById('notif-panel');
+  if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick*="toggleNotif"]')) panel.style.display='none';
+});
+
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = (type === 'success' ? '✓ ' : '✕ ') + msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3500);
+}
+
+/**
+ * Merkezi fetch yardımcısı.
+ * GET haricindeki tüm isteklere CSRF token header'ı ekler.
+ * 401 → login'e yönlendirir; 429 → rate limit mesajı gösterir.
+ */
+async function api(url, method='GET', body=null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (method !== 'GET') opts.headers['X-CSRF-Token'] = CSRF_TOKEN;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if (r.status === 401) { window.location = '/login'; return {}; }
+  if (r.status === 429) { toast('Çok fazla istek. Lütfen bekleyin.', 'error'); return {}; }
+  return r.json();
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

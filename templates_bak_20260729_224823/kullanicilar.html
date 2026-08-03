@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% set active = "kullanicilar" %}
+{% block title %}Kullanıcılar — DataPortal{% endblock %}
+
+{% block extra_style %}
+.pw-hint { font-size: 0.75rem; color: var(--muted); margin-top: 5px; }
+.pw-strength { height: 3px; border-radius: 2px; margin-top: 6px; transition: all 0.3s; background: var(--border2); }
+.pw-strength.weak   { background: var(--danger); width: 33%; }
+.pw-strength.medium { background: var(--warn);   width: 66%; }
+.pw-strength.strong { background: var(--accent);  width: 100%; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Kullanıcılar</h1>
+  <p>Sistem kullanıcılarını yönetin</p>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Kullanıcı Listesi</h2>
+    <button class="btn btn-primary btn-sm" onclick="openModal('modal-add')">+ Yeni Kullanıcı</button>
+  </div>
+  <table>
+    <thead><tr><th>ID</th><th>Kullanıcı Adı</th><th>E-posta</th><th>Rol</th><th>İşlemler</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none;"><div class="empty-icon">◯</div>Henüz kullanıcı yok</div>
+</div>
+
+<!-- EKLE MODAL -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <h3>+ Yeni Kullanıcı</h3>
+    <div class="field">
+      <label>Kullanıcı Adı</label>
+      <input id="a-ad" placeholder="ali.veli" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Şifre</label>
+      <input id="a-sifre" type="password" placeholder="En az 8 karakter" autocomplete="new-password" oninput="pwStrength(this,'a-str')">
+      <div class="pw-strength" id="a-str"></div>
+      <div class="pw-hint">En az 8 karakter, 1 büyük harf, 1 küçük harf, 1 rakam</div>
+    </div>
+    <div class="field">
+      <label>E-posta <span style="color:var(--muted);font-size:0.75rem;">(opsiyonel)</span></label>
+      <input id="a-eposta" type="email" placeholder="ali@ornek.com" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Rol</label>
+      <select id="a-rol"><option value="">— Rol Seçin —</option></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add')">İptal</button>
+      <button class="btn btn-primary" onclick="ekle()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- DÜZENLE MODAL -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <h3>Kullanıcıyı Düzenle</h3>
+    <input type="hidden" id="e-id">
+    <div class="field">
+      <label>Kullanıcı Adı</label>
+      <input id="e-ad" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Yeni Şifre <span style="color:var(--muted);font-size:0.75rem;">(boş = değiştirme)</span></label>
+      <input id="e-sifre" type="password" placeholder="Değiştirmek için doldurun" autocomplete="new-password" oninput="pwStrength(this,'e-str')">
+      <div class="pw-strength" id="e-str"></div>
+      <div class="pw-hint">Boş bırakırsanız şifre değişmez</div>
+    </div>
+    <div class="field">
+      <label>E-posta</label>
+      <input id="e-eposta" type="email" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Rol</label>
+      <select id="e-rol"><option value="">— Rol Seçin —</option></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit')">İptal</button>
+      <button class="btn btn-primary" onclick="guncelle()">Güncelle</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Şifre güç göstergesi */
+function pwStrength(input, barId) {
+  const pw  = input.value;
+  const bar = document.getElementById(barId);
+  if (!pw) { bar.className = 'pw-strength'; return; }
+  let score = 0;
+  if (pw.length >= 8)        score++;
+  if (/[A-Z]/.test(pw))     score++;
+  if (/[a-z]/.test(pw))     score++;
+  if (/\d/.test(pw))        score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  bar.className = 'pw-strength ' + (score <= 2 ? 'weak' : score <= 3 ? 'medium' : 'strong');
+}
+
+async function load() {
+  const roller = await api('/api/roller/all');
+  ['a-rol','e-rol'].forEach(id => {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Rol Seçin —</option>';
+    roller.forEach(r => sel.innerHTML += `<option value="${r.RolID}">${r.RolAdi}</option>`);
+    sel.value = cur;
+  });
+
+  const data = await api('/api/kullanicilar');
+  const rows = data.rows || data;   // sayfalama varsa .rows, yoksa direkt dizi
+  const tbody = document.getElementById('tbody');
+  document.getElementById('empty').style.display = rows.length ? 'none' : 'block';
+  tbody.innerHTML = rows.map(u => `
+    <tr>
+      <td><span class="mono">${u.KullaniciID}</span></td>
+      <td><strong>${escHtml(u.KullaniciAdi)}</strong></td>
+      <td style="color:var(--muted)">${escHtml(u.KullaniciEposta||'—')}</td>
+      <td><span class="badge badge-green">${escHtml(u.RolAdi||u.RolID)}</span></td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick='editRow(${JSON.stringify(u)})'>Düzenle</button>
+        <button class="btn btn-danger btn-sm" onclick="silKullanici('${u.KullaniciID}')">Sil</button>
+      </td>
+    </tr>`).join('');
+}
+
+/* XSS koruması: kullanıcı girdilerini HTML olarak gösterirken escape et */
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function editRow(u) {
+  document.getElementById('e-id').value    = u.KullaniciID;
+  document.getElementById('e-ad').value    = u.KullaniciAdi;
+  document.getElementById('e-sifre').value = '';   // Şifre hash'i ASLA forma doldurulmuyor
+  document.getElementById('e-eposta').value = u.KullaniciEposta || '';
+  document.getElementById('e-rol').value   = u.RolID;
+  document.getElementById('e-str').className = 'pw-strength';
+  openModal('modal-edit');
+}
+
+async function ekle() {
+  const r = await api('/api/kullanicilar', 'POST', {
+    KullaniciAdi:    document.getElementById('a-ad').value.trim(),
+    KullaniciSifresi: document.getElementById('a-sifre').value,
+    KullaniciEposta: document.getElementById('a-eposta').value.trim(),
+    RolID:           document.getElementById('a-rol').value
+  });
+  if (r.ok) { toast('Kullanıcı eklendi'); closeModal('modal-add'); load(); }
+  else toast(r.msg, 'error');
+}
+
+async function guncelle() {
+  const id = document.getElementById('e-id').value;
+  const r  = await api(`/api/kullanicilar/${id}`, 'PUT', {
+    KullaniciAdi:    document.getElementById('e-ad').value.trim(),
+    KullaniciSifresi: document.getElementById('e-sifre').value,  // boş = değiştirme
+    KullaniciEposta: document.getElementById('e-eposta').value.trim(),
+    RolID:           document.getElementById('e-rol').value
+  });
+  if (r.ok) { toast('Güncellendi'); closeModal('modal-edit'); load(); }
+  else toast(r.msg, 'error');
+}
+
+async function silKullanici(id) {
+  if (!confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) return;
+  const r = await api(`/api/kullanicilar/${id}`, 'DELETE');
+  if (r.ok) { toast('Silindi'); load(); }
+  else toast(r.msg, 'error');
+}
+
+load();
+</script>
+{% endblock %}

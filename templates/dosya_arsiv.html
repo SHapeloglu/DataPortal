@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% set active = "dosya-arsiv" %}
+{% block title %}Dosya Arşivi — DataPortal{% endblock %}
+
+{% block extra_style %}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.filters select,.filters input{background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:var(--text);font-family:inherit;font-size:.83rem;outline:none;}
+.filters select:focus,.filters input:focus{border-color:var(--accent);}
+select option{background:var(--surface);}
+.durum-badge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:.72rem;font-weight:500;white-space:nowrap;}
+.d-bekliyor  {background:rgba(251,191,36,.12); color:#fbbf24;       border:1px solid rgba(251,191,36,.2);}
+.d-onaylandi {background:rgba(110,231,183,.12);color:var(--accent);  border:1px solid rgba(110,231,183,.2);}
+.d-reddedildi{background:rgba(248,113,113,.12);color:var(--danger);  border:1px solid rgba(248,113,113,.2);}
+.d-islendi   {background:rgba(56,189,248,.12); color:var(--accent2); border:1px solid rgba(56,189,248,.2);}
+.d-hata      {background:rgba(248,113,113,.12);color:var(--danger);  border:1px solid rgba(248,113,113,.2);}
+.size-cell{font-size:.75rem;color:var(--muted);font-family:'DM Mono',monospace;}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>📦 Dosya Arşivi</h1>
+  <p>Yüklenen tüm Excel dosyaları ve durumları</p>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+    <h2>Dosyalar</h2>
+    <div class="filters">
+      <select id="f-dizin" onchange="yukle()">
+        <option value="">Tüm Dizinler</option>
+      </select>
+      <select id="f-durum" onchange="yukle()">
+        <option value="">Tüm Durumlar</option>
+        <option value="bekliyor">Bekliyor</option>
+        <option value="onaylandi">Onaylandı</option>
+        <option value="reddedildi">Reddedildi</option>
+        <option value="islendi">İşlendi</option>
+        <option value="hata">Hata</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="yukle()">↻ Yenile</button>
+    </div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Dosya</th><th>Dizin</th><th>Hedef Tablo</th><th>Durum</th>
+      <th>Yükleyen</th><th>Tarih</th><th>Satır</th><th>İşlem</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none;"><div class="empty-icon">📦</div>Dosya yok</div>
+</div>
+
+<!-- Onay geçmişi modal -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <strong>Onay Geçmişi</strong>
+      <button onclick="closeModal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;">✕</button>
+    </div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function init() {
+  const r = await api('/api/benim-dizinlerim');
+  const sel = document.getElementById('f-dizin');
+  (r.dizinler||[]).forEach(d => {
+    sel.innerHTML += `<option value="${d.DizinID}">${d.UstDizinAdi ? d.UstDizinAdi+' / ' : ''}${d.DizinAdi}</option>`;
+  });
+  yukle();
+}
+
+async function yukle() {
+  const dizin = document.getElementById('f-dizin').value;
+  const durum = document.getElementById('f-durum').value;
+  let url = '/api/dosya-arsiv?x=1';
+  if(dizin) url += '&dizin_id=' + dizin;
+  if(durum) url += '&durum=' + durum;
+  const r = await api(url);
+  const tb = document.getElementById('tbody');
+  const em = document.getElementById('empty');
+  if(!r.ok || !r.dosyalar.length) { tb.innerHTML=''; em.style.display=''; return; }
+  em.style.display = 'none';
+  tb.innerHTML = r.dosyalar.map(d => `
+    <tr>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(d.OrijinalAd)}">${esc(d.OrijinalAd)}</td>
+      <td>${esc(d.DizinAdi)}</td>
+      <td class="mono">${esc(d.HedefTablo||'—')}</td>
+      <td><span class="durum-badge d-${d.Durum}">${d.Durum}</span></td>
+      <td>${esc(d.YukleyenAdi)}</td>
+      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap;">${(d.YuklemeTarihi||'').slice(0,16)}</td>
+      <td style="text-align:right;">${d.SatirSayisi||'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="gecmis('${d.DosyaID}')">Geçmiş</button></td>
+    </tr>`).join('');
+}
+
+async function gecmis(dosyaId) {
+  const r = await api('/api/dosya-onay-gecmisi/' + dosyaId);
+  const el = document.getElementById('modal-content');
+  if(!r.ok || !r.gecmis.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.85rem;">Onay kaydı yok.</p>';
+  } else {
+    el.innerHTML = r.gecmis.map(g => `
+      <div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span class="durum-badge d-${g.Karar}">${g.Karar}</span>
+          <span style="font-size:.78rem;color:var(--muted);">${(g.KararTarihi||'').slice(0,16)}</span>
+          <span style="font-size:.82rem;font-weight:500;">${esc(g.KullaniciAdi)}</span>
+        </div>
+        ${g.Aciklama ? `<div style="font-size:.8rem;color:var(--muted);">${esc(g.Aciklama)}</div>` : ''}
+      </div>`).join('');
+  }
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+init();
+</script>
+{% endblock %}
