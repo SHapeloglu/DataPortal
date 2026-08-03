@@ -5,3 +5,8 @@ uploads/
 excel_store/
 *.log
 .DS_Store
+DataPortal_guncelle/
+templates_bak_*/
+*.bak
+*.zip
+dataportal/
