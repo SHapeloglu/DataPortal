@@ -17,17 +17,26 @@
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
 
 /* SIDEBAR */
-.sidebar { width: 230px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; z-index: 100; }
+.sidebar { width: 230px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; z-index: 100; overflow: hidden; }
 .sidebar-logo { padding: 28px 22px 20px; border-bottom: 1px solid var(--border); }
 .sidebar-logo span { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .sidebar-logo small { display: block; color: var(--muted); font-size: 0.72rem; margin-top: 2px; }
-nav { padding: 16px 10px; flex: 1; overflow-y: auto; }
+nav { padding: 16px 10px; flex: 1; overflow-y: auto; min-height: 0; }
 nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 0.88rem; font-weight: 500; transition: all 0.2s; margin-bottom: 2px; }
 nav a:hover { background: var(--surface2); color: var(--text); }
 nav a.active { background: rgba(110,231,183,0.1); color: var(--accent); }
 nav a .ico { font-size: 1rem; width: 20px; text-align: center; }
+/* ACCORDION NAV */
+.nav-group { margin-bottom: 2px; }
+.nav-group-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; border-radius: 8px; transition: background 0.2s; user-select: none; }
+.nav-group-header:hover { background: var(--surface2); }
+.nav-group-label { font-size: 0.68rem; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
+.nav-group-arrow { font-size: 0.6rem; color: var(--muted); transition: transform 0.25s; }
+.nav-group.open .nav-group-arrow { transform: rotate(90deg); }
+.nav-group-items { overflow: hidden; max-height: 0; transition: max-height 0.3s ease; }
+.nav-group.open .nav-group-items { max-height: 600px; }
 .nav-section { font-size: 0.68rem; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; padding: 14px 12px 6px; }
-.sidebar-footer { padding: 16px 10px; border-top: 1px solid var(--border); }
+.sidebar-footer { padding: 16px 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .sidebar-footer .user-info { padding: 10px 12px; }
 .sidebar-footer .user-info strong { display: block; font-size: 0.85rem; }
 .sidebar-footer .user-info small { color: var(--muted); font-size: 0.75rem; }
@@ -116,122 +125,135 @@ select option { background: var(--surface); }
     <small>Veri Yönetim Sistemi</small>
   </div>
   <nav>
-    <div class="nav-section">Ana Menü</div>
-    <a href="/dashboard" class="{% if active=='dashboard' %}active{% endif %}">
+    {# Dashboard — accordion yok, her zaman görünür #}
+    <a href="/dashboard" class="{% if active=='dashboard' %}active{% endif %}" style="margin-bottom:6px;">
       <span class="ico">◈</span> Dashboard
     </a>
-    {% if 'Y000007' in yetkiler or 'Y000008' in yetkiler or 'Y000009' in yetkiler %}
-    <div class="nav-section">ETL</div>
-    {% if 'Y000008' in yetkiler %}
-    <a href="/dosya-yukle" class="{% if active=='dosya-yukle' %}active{% endif %}">
-      <span class="ico">⬆</span> Dosya Yükle
-    </a>
+
+    {# ETL Grubu #}
+    {% if 'Y000007' in yetkiler or 'Y000008' in yetkiler or 'Y000009' in yetkiler or 'Y000010' in yetkiler or 'Y000011' in yetkiler or 'Y000012' in yetkiler %}
+    {% set etl_active = active in ['dosya-yukle','onay-bekleyenler','dosya-arsiv','dizin-yonetimi','tablo-konfig','kalite-kurallari','cron-yonetimi'] %}
+    <div class="nav-group {% if etl_active %}open{% endif %}" data-group="etl">
+      <div class="nav-group-header" onclick="toggleGroup('etl')">
+        <span class="nav-group-label">ETL</span>
+        <span class="nav-group-arrow">▶</span>
+      </div>
+      <div class="nav-group-items">
+        {% if 'Y000008' in yetkiler %}
+        <a href="/dosya-yukle" class="{% if active=='dosya-yukle' %}active{% endif %}">
+          <span class="ico">⬆</span> Dosya Yükle
+        </a>
+        {% endif %}
+        {% if 'Y000009' in yetkiler %}
+        <a href="/onay-bekleyenler" class="{% if active=='onay-bekleyenler' %}active{% endif %}">
+          <span class="ico">✅</span> Onay Bekleyenler
+        </a>
+        {% endif %}
+        <a href="/dosya-arsiv" class="{% if active=='dosya-arsiv' %}active{% endif %}">
+          <span class="ico">📦</span> Dosya Arşivi
+        </a>
+        {% if 'Y000007' in yetkiler %}
+        <a href="/dizin-yonetimi" class="{% if active=='dizin-yonetimi' %}active{% endif %}">
+          <span class="ico">📁</span> Dizin Yönetimi
+        </a>
+        {% endif %}
+        {% if 'Y000010' in yetkiler %}
+        <a href="/tablo-konfig" class="{% if active=='tablo-konfig' %}active{% endif %}">
+          <span class="ico">⚙</span> Tablo Konfigürasyonu
+        </a>
+        {% endif %}
+        {% if 'Y000011' in yetkiler %}
+        <a href="/kalite-kurallari" class="{% if active=='kalite-kurallari' %}active{% endif %}">
+          <span class="ico">🔍</span> Kalite Kuralları
+        </a>
+        {% endif %}
+        {% if 'Y000012' in yetkiler %}
+        <a href="/cron-yonetimi" class="{% if active=='cron-yonetimi' %}active{% endif %}">
+          <span class="ico">⏱</span> Cron Görevleri
+        </a>
+        {% endif %}
+      </div>
+    </div>
     {% endif %}
-    {% if 'Y000009' in yetkiler %}
-    <a href="/onay-bekleyenler" class="{% if active=='onay-bekleyenler' %}active{% endif %}">
-      <span class="ico">✅</span> Onay Bekleyenler
-    </a>
+
+    {# Veri Grubu #}
+    {% if 'Y000003' in yetkiler or 'Y000004' in yetkiler or 'Y000005' in yetkiler %}
+    {% set veri_active = active in ['excel-create','excel-load','tablo-goruntule','tablo-sil'] %}
+    <div class="nav-group {% if veri_active %}open{% endif %}" data-group="veri">
+      <div class="nav-group-header" onclick="toggleGroup('veri')">
+        <span class="nav-group-label">Veri</span>
+        <span class="nav-group-arrow">▶</span>
+      </div>
+      <div class="nav-group-items">
+        {% if 'Y000003' in yetkiler %}
+        <a href="/excel-mysql-create" class="{% if active=='excel-create' %}active{% endif %}">
+          <span class="ico">⬛</span> Tablo Oluştur
+        </a>
+        {% endif %}
+        {% if 'Y000004' in yetkiler %}
+        <a href="/excel-mysql-load" class="{% if active=='excel-load' %}active{% endif %}">
+          <span class="ico">⬜</span> Veri Yükle
+        </a>
+        <a href="/tablo-goruntule" class="{% if active=='tablo-goruntule' %}active{% endif %}">
+          <span class="ico">⊞</span> Tablo Görüntüle
+        </a>
+        {% endif %}
+        {% if 'Y000005' in yetkiler %}
+        <a href="/tablo-sil" class="{% if active=='tablo-sil' %}active{% endif %}">
+          <span class="ico">✕</span> Tablo Sil
+        </a>
+        {% endif %}
+      </div>
+    </div>
     {% endif %}
-    <a href="/dosya-arsiv" class="{% if active=='dosya-arsiv' %}active{% endif %}">
-      <span class="ico">📦</span> Dosya Arşivi
-    </a>
-    {% if 'Y000007' in yetkiler %}
-    <a href="/dizin-yonetimi" class="{% if active=='dizin-yonetimi' %}active{% endif %}">
-      <span class="ico">📁</span> Dizin Yönetimi
-    </a>
+
+    {# Yönetim Grubu #}
+    {% if 'Y000001' in yetkiler or 'Y000002' in yetkiler %}
+    {% set yonetim_active = active in ['kullanicilar','audit-log','roller','yetkiler'] %}
+    <div class="nav-group {% if yonetim_active %}open{% endif %}" data-group="yonetim">
+      <div class="nav-group-header" onclick="toggleGroup('yonetim')">
+        <span class="nav-group-label">Yönetim</span>
+        <span class="nav-group-arrow">▶</span>
+      </div>
+      <div class="nav-group-items">
+        {% if 'Y000001' in yetkiler %}
+        <a href="/kullanicilar" class="{% if active=='kullanicilar' %}active{% endif %}">
+          <span class="ico">◯</span> Kullanıcılar
+        </a>
+        <a href="/audit-log" class="{% if active=='audit-log' %}active{% endif %}">
+          <span class="ico">📋</span> Audit Log
+        </a>
+        {% endif %}
+        {% if 'Y000002' in yetkiler %}
+        <a href="/roller" class="{% if active=='roller' %}active{% endif %}">
+          <span class="ico">◐</span> Roller
+        </a>
+        <a href="/yetkiler" class="{% if active=='yetkiler' %}active{% endif %}">
+          <span class="ico">◑</span> Yetkiler
+        </a>
+        {% endif %}
+      </div>
+    </div>
     {% endif %}
-    {% if 'Y000010' in yetkiler %}
-    <a href="/tablo-konfig" class="{% if active=='tablo-konfig' %}active{% endif %}">
-      <span class="ico">⚙</span> Tablo Konfigürasyonu
-    </a>
-    {% endif %}
-    {% if 'Y000011' in yetkiler %}
-    <a href="/kalite-kurallari" class="{% if active=='kalite-kurallari' %}active{% endif %}">
-      <span class="ico">🔍</span> Kalite Kuralları
-    </a>
-    {% endif %}
-    {% if 'Y000012' in yetkiler %}
-    <a href="/cron-yonetimi" class="{% if active=='cron-yonetimi' %}active{% endif %}">
-      <span class="ico">⏱</span> Cron Görevleri
-    </a>
-    {% endif %}
-    {% endif %}
-    {% if 'Y000003' in yetkiler %}
-    <a href="/excel-mysql-create" class="{% if active=='excel-create' %}active{% endif %}">
-      <span class="ico">⬛</span> Tablo Oluştur
-    </a>
-    {% endif %}
-    {% if 'Y000004' in yetkiler %}
-    <a href="/excel-mysql-load" class="{% if active=='excel-load' %}active{% endif %}">
-      <span class="ico">⬜</span> Veri Yükle
-    </a>
-    <a href="/tablo-goruntule" class="{% if active=='tablo-goruntule' %}active{% endif %}">
-      <span class="ico">⊞</span> Tablo Görüntüle
-    </a>
-    {% endif %}
-    {% if 'Y000005' in yetkiler %}
-    <a href="/tablo-sil" class="{% if active=='tablo-sil' %}active{% endif %}">
-      <span class="ico">✕</span> Tablo Sil
-    </a>
-    {% endif %}
-    <div class="nav-section">Yönetim</div>
-    {% if 'Y000008' in yetkiler %}
-    <a href="/dosya-yukle" class="{% if active=='dosya-yukle' %}active{% endif %}">
-      <span class="ico">📤</span> Dosya Yükle
-    </a>
-    <a href="/dosya-arsiv" class="{% if active=='dosya-arsiv' %}active{% endif %}">
-      <span class="ico">📦</span> Dosya Arşivi
-    </a>
-    {% endif %}
-    {% if 'Y000009' in yetkiler %}
-    <a href="/onay-bekleyenler" class="{% if active=='onay-bekleyenler' %}active{% endif %}">
-      <span class="ico">✅</span> Onay Bekleyenler
-    </a>
-    {% endif %}
-    {% if 'Y000007' in yetkiler %}
-    <a href="/dizin-yonetimi" class="{% if active=='dizin-yonetimi' %}active{% endif %}">
-      <span class="ico">📁</span> Dizin Yönetimi
-    </a>
-    {% endif %}
-    {% if 'Y000010' in yetkiler %}
-    <a href="/tablo-konfig" class="{% if active=='tablo-konfig' %}active{% endif %}">
-      <span class="ico">⚙️</span> Tablo Konfigürasyon
-    </a>
-    {% endif %}
-    {% if 'Y000011' in yetkiler %}
-    <a href="/kalite-kurallari" class="{% if active=='kalite-kurallari' %}active{% endif %}">
-      <span class="ico">🔍</span> Kalite Kuralları
-    </a>
-    {% endif %}
-    {% if 'Y000012' in yetkiler %}
-    <a href="/cron-yonetimi" class="{% if active=='cron-yonetimi' %}active{% endif %}">
-      <span class="ico">⏰</span> Cron Yönetimi
-    </a>
-    {% endif %}
-    {% if 'Y000001' in yetkiler %}
-    <a href="/kullanicilar" class="{% if active=='kullanicilar' %}active{% endif %}">
-      <span class="ico">◯</span> Kullanıcılar
-    </a>
-    <a href="/audit-log" class="{% if active=='audit-log' %}active{% endif %}">
-      <span class="ico">📋</span> Audit Log
-    </a>
-    {% endif %}
-    {% if 'Y000002' in yetkiler %}
-    <a href="/roller" class="{% if active=='roller' %}active{% endif %}">
-      <span class="ico">◐</span> Roller
-    </a>
-    <a href="/yetkiler" class="{% if active=='yetkiler' %}active{% endif %}">
-      <span class="ico">◑</span> Yetkiler
-    </a>
-    {% endif %}
-    <div class="nav-section">Hesap</div>
-    <a href="/sifre-degistir" class="{% if active=='sifre-degistir' %}active{% endif %}">
-      <span class="ico">🔑</span> Şifre Değiştir
-    </a>
-    <a href="/yardim" class="{% if active=='yardim' %}active{% endif %}">
-      <span class="ico">❓</span> Yardım
-    </a>
+
+    {# Hesap Grubu #}
+    {% set hesap_active = active in ['sifre-degistir','yardim'] %}
+    <div class="nav-group {% if hesap_active %}open{% endif %}" data-group="hesap">
+      <div class="nav-group-header" onclick="toggleGroup('hesap')">
+        <span class="nav-group-label">Hesap</span>
+        <span class="nav-group-arrow">▶</span>
+      </div>
+      <div class="nav-group-items">
+        <a href="/sifre-degistir" class="{% if active=='sifre-degistir' %}active{% endif %}">
+          <span class="ico">🔑</span> Şifre Değiştir
+        </a>
+        <a href="/yardim" class="{% if active=='yardim' %}active{% endif %}">
+          <span class="ico">❓</span> Yardım
+        </a>
+      </div>
+    </div>
   </nav>
+
   <div class="sidebar-footer">
     <div class="user-info">
       <strong>{{ kullanici_adi }}</strong>
@@ -247,7 +269,12 @@ select option { background: var(--surface); }
       </div>
       <div id="notif-list" style="padding:8px;"></div>
     </div>
-    <a href="/logout" class="btn btn-danger btn-sm" style="margin: 6px 12px;">↪ Çıkış</a>
+    <a href="/logout"
+       onclick="return confirm('Oturumu kapatmak istediğinizden emin misiniz?')"
+       class="btn btn-danger btn-sm"
+       style="margin: 8px 12px; width: calc(100% - 24px); justify-content: center;">
+      ↪ Çıkış Yap
+    </a>
   </div>
 </aside>
 
@@ -264,6 +291,18 @@ select option { background: var(--surface); }
 const CSRF_TOKEN = "{{ csrf_token }}";
 
 /* ── Bildirim sistemi ──────────────────────────────────────────────────────── */
+const TIP_ICON = {
+  onay_bekliyor: '⏳', onaylandi: '✅', reddedildi: '❌',
+  yuklendi: '📥', yukleme_hatasi: '🔴', kalite_uyari: '⚠️',
+  kalite_hatasi: '🚨', cron_hata: '🔴', sistem: 'ℹ️'
+};
+const TIP_RENK = {
+  onaylandi: 'var(--accent)', reddedildi: 'var(--danger)',
+  yuklendi: 'var(--accent2)', yukleme_hatasi: 'var(--danger)',
+  kalite_uyari: 'var(--warn)', kalite_hatasi: 'var(--danger)',
+  onay_bekliyor: 'var(--warn)'
+};
+
 async function loadBildirimler() {
   try {
     const r = await api('/api/bildirimler');
@@ -273,36 +312,58 @@ async function loadBildirimler() {
     if (r.okunmamis > 0) { badge.style.display='inline'; badge.textContent=r.okunmamis; }
     else badge.style.display='none';
     if (!list) return;
-    if (!r.bildirimler.length) { list.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:.82rem;">Bildirim yok</div>'; return; }
-    const tipIcon = {onay_bekliyor:'⏳',onaylandi:'✅',reddedildi:'❌',kalite_hatasi:'⚠️',cron_hata:'🔴',sistem:'ℹ️'};
-    list.innerHTML = r.bildirimler.map(b=>`
-      <div style="display:flex;gap:8px;padding:8px 6px;border-radius:7px;${!b.Okundu?'background:rgba(110,231,183,.04);':''}">
-        <span style="font-size:1rem;flex-shrink:0;">${tipIcon[b.Tip]||'📌'}</span>
-        <div>
-          <div style="font-size:.82rem;font-weight:${b.Okundu?'400':'600'};color:var(--text);">${b.Baslik}</div>
-          ${b.Mesaj?`<div style="font-size:.75rem;color:var(--muted);margin-top:2px;">${b.Mesaj}</div>`:''}
-          <div style="font-size:.7rem;color:var(--muted);margin-top:2px;">${b.Tarih}</div>
+    if (!r.bildirimler.length) {
+      list.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:.82rem;">Bildirim yok</div>';
+      return;
+    }
+    list.innerHTML = r.bildirimler.map(b => {
+      const renk = TIP_RENK[b.Tip] || 'var(--muted)';
+      const cursor = b.DosyaID ? 'pointer' : 'default';
+      const onclick = b.DosyaID ? `onclick="bildirimTikla(${b.BildirimID}, '${b.DosyaID}')"` : `onclick="bildirimOku(${b.BildirimID})"`;
+      return `
+      <div ${onclick} style="display:flex;gap:8px;padding:9px 8px;border-radius:8px;cursor:${cursor};transition:background .15s;${!b.Okundu?'background:rgba(110,231,183,.05);border-left:2px solid '+renk+';padding-left:10px;':'opacity:.7;'}"
+           onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='${!b.Okundu?'rgba(110,231,183,.05)':'transparent'}'">
+        <span style="font-size:1rem;flex-shrink:0;margin-top:1px;">${TIP_ICON[b.Tip]||'📌'}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.82rem;font-weight:${b.Okundu?'400':'600'};color:var(--text);line-height:1.3;">${b.Baslik}</div>
+          ${b.Mesaj?`<div style="font-size:.75rem;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.Mesaj}</div>`:''}
+          <div style="font-size:.7rem;color:var(--muted);margin-top:3px;">${b.Tarih}</div>
         </div>
-      </div>`).join('');
+        ${!b.Okundu?`<span style="width:6px;height:6px;border-radius:50%;background:${renk};flex-shrink:0;margin-top:5px;"></span>`:''}
+      </div>`;
+    }).join('');
   } catch(e) {}
 }
-function toggleNotif(e) {
-  e.preventDefault();
-  const panel=document.getElementById('notif-panel');
-  const isOpen=panel.style.display!=='none';
-  panel.style.display=isOpen?'none':'block';
-  if(!isOpen) loadBildirimler();
-}
-async function tumunuOku() {
-  await api('/api/bildirimler/okundu','POST',{});
-  document.getElementById('notif-badge').style.display='none';
+
+async function bildirimOku(id) {
+  try { await api(`/api/bildirimler/${id}/okundu`, 'POST', {}); } catch(e) {}
   loadBildirimler();
 }
+
+async function bildirimTikla(id, dosyaId) {
+  await bildirimOku(id);
+  window.location = `/dosya-arsiv`;
+}
+
+function toggleNotif(e) {
+  e.preventDefault();
+  const panel = document.getElementById('notif-panel');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) loadBildirimler();
+}
+
+async function tumunuOku() {
+  await api('/api/bildirimler/okundu', 'POST', {});
+  document.getElementById('notif-badge').style.display = 'none';
+  loadBildirimler();
+}
+
 loadBildirimler();
-setInterval(loadBildirimler,60000);
-document.addEventListener('click',e=>{
-  const panel=document.getElementById('notif-panel');
-  if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick*="toggleNotif"]')) panel.style.display='none';
+setInterval(loadBildirimler, 5000);
+document.addEventListener('click', e => {
+  const panel = document.getElementById('notif-panel');
+  if (panel && !panel.contains(e.target) && !e.target.closest('[onclick*="toggleNotif"]')) panel.style.display = 'none';
 });
 
 function toast(msg, type='success') {
@@ -329,6 +390,28 @@ async function api(url, method='GET', body=null) {
 
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ── Accordion nav ──────────────────────────────────────────────────────── */
+function toggleGroup(name) {
+  const el = document.querySelector(`.nav-group[data-group="${name}"]`);
+  if (!el) return;
+  const isOpen = el.classList.contains('open');
+  el.classList.toggle('open', !isOpen);
+  try { localStorage.setItem('nav_' + name, !isOpen ? '1' : '0'); } catch(e) {}
+}
+
+// localStorage'dan kapalı grupları geri yükle
+// (Sunucu tarafı zaten aktif grubu açık render ediyor;
+//  burada sadece kullanıcının manuel kapattıklarını hatırlıyoruz)
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.nav-group').forEach(el => {
+    const name = el.dataset.group;
+    const saved = localStorage.getItem('nav_' + name);
+    // Aktif sayfa bu gruptaysa localStorage'ı yok say — her zaman açık
+    if (el.classList.contains('open')) return;
+    if (saved === '1') el.classList.add('open');
+  });
+});
 </script>
 {% block scripts %}{% endblock %}
 </body>

@@ -180,8 +180,7 @@ def get_pool():
                 password=cfg['password'],
                 database=cfg['database'],
                 charset='utf8mb4',
-                collation='utf8mb4_unicode_ci',
-                use_unicode=True
+                collation='utf8mb4_unicode_ci'
             )
         except Exception as e:
             logger.error(f'Connection pool oluşturulamadı: {e}')
@@ -263,11 +262,8 @@ def has_yetki(yetki_id):
     return bool(session.get('kullanici_id')) and yetki_id in set(session.get('yetkiler', []))
 
 def tablo_yetkili_mi(tablo_adi, kullanici_id):
-    """Kullanıcının rolüne bu tablo atanmış mı? Admin her tabloya erişebilir."""
+    """Kullanıcının rolüne bu tablo atanmış mı? Atanmamışsa erişim engellenir."""
     try:
-        # Admin her tabloya erişebilir
-        if admin_mi(kullanici_id):
-            return True
         yetkili = query("""
             SELECT rt.TablAdi FROM rol_tablo rt
             JOIN kullanici k ON k.RolID = rt.RolID
@@ -421,8 +417,7 @@ def api_connect():
         conn = mysql.connector.connect(
             host=d['host'], port=int(d['port']),
             user=d['user'], password=d['password'],
-            database=d['database'], connect_timeout=5,
-            charset='utf8mb4', use_unicode=True
+            database=d['database'], connect_timeout=5
         )
         conn.close()
         global _pool
@@ -465,7 +460,6 @@ def api_login():
 
         session['kullanici_id']  = row['KullaniciID']
         session['kullanici_adi'] = row['KullaniciAdi']
-        session['rol_id']        = row['RolID']
         session['yetkiler']      = list(kullanici_yetkileri(row['KullaniciID']))
         session['csrf_token']    = secrets.token_hex(32)   # Giriş sonrası token yenile
         session.permanent        = True
@@ -644,28 +638,15 @@ def api_excel_upload():
         if not conn:
             return jsonify({'success': False, 'message': 'Veritabanı bağlantısı kurulamadı.'})
         cur = conn.cursor()
-        logger.info(f"DROP TABLE: {table_name}")
         cur.execute(f"DROP TABLE IF EXISTS `{table_name}`")
-        logger.info(f"Sütun sayısı: {len(columns)}, ilk 3: {columns[:3]}")
-        safe_columns = [sanitize(c) for c in columns]
-        logger.info(f"Safe sütun sayısı: {len(safe_columns)}, ilk 3: {safe_columns[:3]}")
-        cols_def = ', '.join([f"`{c}` LONGTEXT" for c in safe_columns])
-        create_sql = f"CREATE TABLE `{table_name}` ({cols_def}) ROW_FORMAT=DYNAMIC"
-        logger.info(f"CREATE SQL uzunluk: {len(create_sql)}, baş: {create_sql[:300]}")
-        cur.execute(create_sql)
-        logger.info("CREATE TABLE başarılı")
+        cols_def = ', '.join([f"`{c}` NVARCHAR(500)" for c in columns])
+        cur.execute(f"CREATE TABLE `{table_name}` ({cols_def}) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         _tablo_log_kaydet(cur, table_name, session.get('kullanici_id'), 'OLUSTUR', 0, 0, 0)
-        # Oluşturan kullanıcının rolüne otomatik tablo yetkisi ver
-        rol_id = session.get('rol_id')
-        if rol_id:
-            cur.execute("""
-                INSERT IGNORE INTO rol_tablo (RolID, TablAdi) VALUES (%s, %s)
-            """, (rol_id, table_name))
         conn.commit()
         conn.close()
         audit('TABLE_CREATE', f'Tablo: {table_name}')
         logger.info(f'Tablo oluşturuldu: {table_name} ({len(columns)} sütun)')
-        sql = f"CREATE TABLE `{table_name}` (\n  " + ',\n  '.join([f"`{c}` LONGTEXT" for c in columns]) + "\n) ROW_FORMAT=DYNAMIC"
+        sql = f"CREATE TABLE `{table_name}` (\n  " + ',\n  '.join([f"`{c}` NVARCHAR(500)" for c in columns]) + "\n)"
         return jsonify({'success': True, 'message': f'"{table_name}" tablosu oluşturuldu!',
                         'table': table_name, 'columns': columns, 'sql': sql})
     except Exception as e:
@@ -766,23 +747,18 @@ def api_excel_load():
         cur.execute(f"SHOW COLUMNS FROM `{table_name}`")
         db_cols = [r['Field'] for r in cur.fetchall()]
         if 'ETL_DATE' not in db_cols:
-            cur.execute(f"ALTER TABLE `{table_name}` ADD COLUMN `ETL_DATE` VARCHAR(30)")
+            cur.execute(f"ALTER TABLE `{table_name}` ADD COLUMN `ETL_DATE` NVARCHAR(30)")
             conn.commit()
             db_cols.append('ETL_DATE')
 
-        # Sütun eşleştirme (tam, case-insensitive ve sanitize)
-        db_cols_lower    = {c.lower(): c for c in db_cols}
-        db_cols_sanitize = {sanitize(c).lower(): c for c in db_cols}
+        # Sütun eşleştirme (case-insensitive)
+        db_cols_lower = {c.lower(): c for c in db_cols}
         matched_pairs = []
         for ec in df.columns:
             if ec in db_cols and ec != 'ETL_DATE':
                 matched_pairs.append((ec, ec))
             elif ec.lower() in db_cols_lower and db_cols_lower[ec.lower()] != 'ETL_DATE':
                 matched_pairs.append((ec, db_cols_lower[ec.lower()]))
-            else:
-                san = sanitize(ec).lower()
-                if san in db_cols_sanitize and db_cols_sanitize[san] != 'ETL_DATE':
-                    matched_pairs.append((ec, db_cols_sanitize[san]))
         matched = [dc for _, dc in matched_pairs]
 
         if not matched:
@@ -1465,16 +1441,6 @@ def kullanici_dizin_yetkileri(kullanici_id):
     """, (rol_id, kullanici_id))
     return {r['DizinID'] for r in rows}
 
-
-def kullanici_dizinleri(kullanici_id, rol_id, sadece_yazma=False):
-    """kullanici_dizin_yetkileri için uyumlu alias (YetkiTuru filtreli)."""
-    yetki_filtre = "AND YetkiTuru='yazma'" if sadece_yazma else ""
-    rows = query(f"""
-        SELECT DISTINCT DizinID FROM dizin_yetki
-        WHERE (RolID = %s OR KullaniciID = %s) {yetki_filtre}
-    """, (rol_id, kullanici_id))
-    return {r['DizinID'] for r in rows}
-
 def bildirim_gonder(alici_id, tip, baslik, mesaj=None, dosya_id=None):
     """Sisteme bildirim ekler."""
     try:
@@ -1489,350 +1455,6 @@ def bildirim_gonder(alici_id, tip, baslik, mesaj=None, dosya_id=None):
         conn.close()
     except Exception as e:
         logger.error(f'Bildirim gönderilemedi: {e}')
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MODÜL 5 — DOSYA ONAY SONRASI DB AKTARIM
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _sp_calistir(conn, sp_adi):
-    """Stored procedure çalıştırır. sp_adi sanitize edilmiş olmalı."""
-    cur = conn.cursor()
-    cur.callproc(sp_adi)
-    for _ in cur.stored_results():
-        pass
-    conn.commit()
-    cur.close()
-
-
-def _kalite_kontrol_calistir(conn, tablo_adi):
-    """
-    Tablonun aktif kalite kurallarını çalıştırır.
-    Döner: {'gecti': bool, 'sonuclar': [...], 'hata_sayisi': int, 'uyari_sayisi': int}
-    """
-    cur = conn.cursor(dictionary=True)
-    cur.execute(
-        "SELECT * FROM kalite_kural WHERE TabloAdi=%s AND AktifMi=1",
-        (tablo_adi,)
-    )
-    kurallar = cur.fetchall()
-    cur.close()
-
-    sonuclar    = []
-    hata_sayisi = 0
-    uyari_sayisi = 0
-
-    for k in kurallar:
-        sutun   = k['SutunAdi']
-        tip     = k['KuralTipi']
-        deger   = k['KuralDeger'] or ''
-        seviye  = k['HataSeviyesi']  # 'hata' veya 'uyari'
-        ihlal   = 0
-
-        try:
-            c2 = conn.cursor()
-            if tip == 'bos_deger':
-                c2.execute(
-                    f"SELECT COUNT(*) FROM `{tablo_adi}` "
-                    f"WHERE `{sutun}` IS NULL OR TRIM(`{sutun}`)=''")
-                ihlal = c2.fetchone()[0]
-
-            elif tip == 'uzunluk' and deger.isdigit():
-                c2.execute(
-                    f"SELECT COUNT(*) FROM `{tablo_adi}` "
-                    f"WHERE CHAR_LENGTH(`{sutun}`) > %s", (int(deger),))
-                ihlal = c2.fetchone()[0]
-
-            elif tip == 'format' and deger:
-                c2.execute(
-                    f"SELECT COUNT(*) FROM `{tablo_adi}` "
-                    f"WHERE `{sutun}` NOT REGEXP %s "
-                    f"AND `{sutun}` IS NOT NULL AND TRIM(`{sutun}`)!=''",
-                    (deger,))
-                ihlal = c2.fetchone()[0]
-
-            elif tip == 'benzersiz':
-                c2.execute(
-                    f"SELECT COUNT(*) - COUNT(DISTINCT `{sutun}`) "
-                    f"FROM `{tablo_adi}`")
-                ihlal = c2.fetchone()[0]
-
-            elif tip == 'deger_listesi' and deger:
-                izinliler = [v.strip() for v in deger.split(',')]
-                fmt = ','.join(['%s'] * len(izinliler))
-                c2.execute(
-                    f"SELECT COUNT(*) FROM `{tablo_adi}` "
-                    f"WHERE `{sutun}` NOT IN ({fmt}) "
-                    f"AND `{sutun}` IS NOT NULL AND TRIM(`{sutun}`)!=''",
-                    tuple(izinliler))
-                ihlal = c2.fetchone()[0]
-
-            c2.close()
-
-            sonuc = {
-                'kural_id'  : k['KuralID'],
-                'sutun'     : sutun,
-                'tip'       : tip,
-                'seviye'    : seviye,
-                'ihlal_sayisi': ihlal,
-                'gecti'     : ihlal == 0
-            }
-            sonuclar.append(sonuc)
-
-            if ihlal > 0:
-                if seviye == 'hata':
-                    hata_sayisi += 1
-                else:
-                    uyari_sayisi += 1
-
-        except Exception as e:
-            sonuclar.append({
-                'kural_id'    : k['KuralID'],
-                'sutun'       : sutun,
-                'tip'         : tip,
-                'seviye'      : seviye,
-                'ihlal_sayisi': -1,
-                'gecti'       : False,
-                'hata'        : str(e)
-            })
-            if seviye == 'hata':
-                hata_sayisi += 1
-
-    return {
-        'gecti'       : hata_sayisi == 0,
-        'sonuclar'    : sonuclar,
-        'hata_sayisi' : hata_sayisi,
-        'uyari_sayisi': uyari_sayisi
-    }
-
-
-def dosya_db_aktar(dosya_id):
-    """
-    Onaylanmış Excel dosyasını hedef tabloya aktarır.
-    Akış: BeforeSP → Excel yükle → Kalite kontrol → AfterSP → Bildirim
-
-    Döner: {'ok': bool, 'msg': str}
-    """
-    import json as _json
-    from datetime import datetime
-
-    conn = None
-    try:
-        dosya = query("SELECT * FROM excel_dosya WHERE DosyaID=%s", (dosya_id,), fetchone=True)
-        if not dosya:
-            return {'ok': False, 'msg': 'Dosya kaydı bulunamadı.'}
-
-        if dosya['Durum'] not in ('onaylandi',):
-            return {'ok': False, 'msg': f'Aktarım için uygun durum değil: {dosya["Durum"]}'}
-
-        tablo_adi = dosya['HedefTablo']
-        dosya_yol = dosya['DosyaYolu']
-
-        if not os.path.exists(dosya_yol):
-            execute(
-                "UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s",
-                (dosya_id,))
-            return {'ok': False, 'msg': f'Fiziksel dosya bulunamadı: {dosya_yol}'}
-
-        # Konfigürasyon
-        konfig    = query("SELECT * FROM tablo_konfig WHERE TabloAdi=%s", (tablo_adi,), fetchone=True)
-        before_sp = sanitize(konfig['BeforeSP']) if konfig and konfig.get('BeforeSP') else None
-        after_sp  = sanitize(konfig['AfterSP'])  if konfig and konfig.get('AfterSP')  else None
-        mod       = (konfig['YukleModu'] if konfig and konfig.get('YukleModu') else 'truncate')
-
-        # Yükleniyor durumuna al
-        execute("UPDATE excel_dosya SET Durum='yukleniyor' WHERE DosyaID=%s", (dosya_id,))
-
-        conn = get_conn()
-        if not conn:
-            execute("UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s", (dosya_id,))
-            return {'ok': False, 'msg': 'Veritabanı bağlantısı kurulamadı.'}
-
-        # ── BeforeSP ────────────────────────────────────────────────────────
-        if before_sp:
-            try:
-                _sp_calistir(conn, before_sp)
-                logger.info(f'BeforeSP çalıştı: {before_sp} (DosyaID:{dosya_id})')
-            except Exception as e:
-                execute("UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s", (dosya_id,))
-                conn.close()
-                return {'ok': False, 'msg': f'BeforeSP hatası ({before_sp}): {e}'}
-
-        # ── Excel → MySQL ────────────────────────────────────────────────────
-        try:
-            df = pd.read_excel(dosya_yol, header=0, dtype=str).fillna('')
-        except Exception as e:
-            execute("UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s", (dosya_id,))
-            conn.close()
-            return {'ok': False, 'msg': f'Excel okunamadı: {e}'}
-
-        if df.empty:
-            execute("UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s", (dosya_id,))
-            conn.close()
-            return {'ok': False, 'msg': 'Excel dosyası boş.'}
-
-        cur_meta = conn.cursor(dictionary=True)
-        cur_meta.execute(f"SHOW COLUMNS FROM `{tablo_adi}`")
-        db_cols = [r['Field'] for r in cur_meta.fetchall()]
-        cur_meta.close()
-
-        # ETL_DATE sütunu ekle (yoksa)
-        if 'ETL_DATE' not in db_cols:
-            c = conn.cursor()
-            c.execute(f"ALTER TABLE `{tablo_adi}` ADD COLUMN `ETL_DATE` VARCHAR(30)")
-            conn.commit()
-            c.close()
-            db_cols.append('ETL_DATE')
-
-        db_cols_lower = {c.lower(): c for c in db_cols}
-        matched_pairs = []
-        for ec in df.columns:
-            if ec in db_cols and ec != 'ETL_DATE':
-                matched_pairs.append((ec, ec))
-            elif ec.lower() in db_cols_lower and db_cols_lower[ec.lower()] != 'ETL_DATE':
-                matched_pairs.append((ec, db_cols_lower[ec.lower()]))
-
-        if not matched_pairs:
-            execute("UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s", (dosya_id,))
-            conn.close()
-            return {'ok': False, 'msg': 'Excel sütunları tablo sütunlarıyla eşleşmedi.'}
-
-        matched    = [dc for _, dc in matched_pairs]
-        etl_date   = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        all_cols   = matched + ['ETL_DATE']
-        col_list   = ', '.join([f'`{c}`' for c in all_cols])
-        ph         = ', '.join(['%s'] * len(all_cols))
-        ins_sql    = f"INSERT INTO `{tablo_adi}` ({col_list}) VALUES ({ph})"
-
-        eklenen = atlanan = tekrar = 0
-        cur_dml = conn.cursor()
-
-        if mod == 'truncate':
-            cur_dml.execute(f"TRUNCATE TABLE `{tablo_adi}`")
-            conn.commit()
-            for _, row in df.iterrows():
-                try:
-                    vals = [str(row[ec]) for ec, _ in matched_pairs] + [etl_date]
-                    cur_dml.execute(ins_sql, vals)
-                    eklenen += 1
-                except Exception:
-                    atlanan += 1
-        else:
-            col_sel = ', '.join([f'`{c}`' for c in matched])
-            cur_dml.execute(f"SELECT {col_sel} FROM `{tablo_adi}`")
-            mevcut = set()
-            while True:
-                batch = cur_dml.fetchmany(5000)
-                if not batch:
-                    break
-                for er in batch:
-                    mevcut.add(tuple(str(v) for v in er))
-            for _, row in df.iterrows():
-                try:
-                    vals  = [str(row[ec]) for ec, _ in matched_pairs]
-                    tup   = tuple(vals)
-                    if tup in mevcut:
-                        tekrar += 1
-                        continue
-                    cur_dml.execute(ins_sql, vals + [etl_date])
-                    mevcut.add(tup)
-                    eklenen += 1
-                except Exception:
-                    atlanan += 1
-
-        _tablo_log_kaydet(cur_dml, tablo_adi, dosya['YukleyenID'], 'DOSYA_YUKLE', eklenen, atlanan, tekrar)
-        conn.commit()
-        cur_dml.close()
-
-        # ── Kalite Kontrol ───────────────────────────────────────────────────
-        kalite_sonuc = _kalite_kontrol_calistir(conn, tablo_adi)
-        kalite_json  = _json.dumps(kalite_sonuc['sonuclar'], ensure_ascii=False)
-
-        # yukle_log kaydı
-        try:
-            c = conn.cursor()
-            c.execute("""
-                INSERT INTO yukle_log
-                    (DosyaID, TabloAdi, Durum, Mesaj, EklenenSatir, AtlananSatir, KalisonucJSON)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                dosya_id, tablo_adi,
-                'basarili' if kalite_sonuc['gecti'] else 'uyari',
-                f"Eklenen:{eklenen} Atlanan:{atlanan} Tekrar:{tekrar} "
-                f"KaliteHata:{kalite_sonuc['hata_sayisi']} KaliteUyari:{kalite_sonuc['uyari_sayisi']}",
-                eklenen, atlanan, kalite_json
-            ))
-            conn.commit()
-            c.close()
-        except Exception as e:
-            logger.warning(f'yukle_log yazılamadı (tablo olmayabilir): {e}')
-
-        # Kalite hatası varsa aktarımı geri al
-        if not kalite_sonuc['gecti']:
-            conn.close()
-            execute("UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s", (dosya_id,))
-            bildirim_gonder(
-                dosya['YukleyenID'], 'yukleme_hatasi',
-                f'Kalite Hatası: {dosya["OrijinalAd"]}',
-                f'{kalite_sonuc["hata_sayisi"]} kalite kuralı ihlali tespit edildi. '
-                f'Veri aktarılmadı.',
-                dosya_id
-            )
-            audit('DOSYA_KALITE_HATASI',
-                  f'DosyaID:{dosya_id} Tablo:{tablo_adi} '
-                  f'Hata:{kalite_sonuc["hata_sayisi"]} Uyari:{kalite_sonuc["uyari_sayisi"]}')
-            return {
-                'ok'    : False,
-                'msg'   : f'Kalite kontrolü başarısız: {kalite_sonuc["hata_sayisi"]} hata.',
-                'kalite': kalite_sonuc
-            }
-
-        # ── AfterSP ─────────────────────────────────────────────────────────
-        if after_sp:
-            try:
-                _sp_calistir(conn, after_sp)
-                logger.info(f'AfterSP çalıştı: {after_sp} (DosyaID:{dosya_id})')
-            except Exception as e:
-                logger.error(f'AfterSP hatası ({after_sp}): {e}')
-                # AfterSP hatası veriyi geri almaz, sadece loglanır
-
-        conn.close()
-
-        # ── Başarı ──────────────────────────────────────────────────────────
-        execute("UPDATE excel_dosya SET Durum='yuklendi' WHERE DosyaID=%s", (dosya_id,))
-
-        mesaj = f'{eklenen} satır aktarıldı.'
-        if tekrar:   mesaj += f' {tekrar} tekrar atlandı.'
-        if atlanan:  mesaj += f' {atlanan} hatalı atlandı.'
-        if kalite_sonuc['uyari_sayisi']:
-            mesaj += f' {kalite_sonuc["uyari_sayisi"]} kalite uyarısı.'
-
-        bildirim_gonder(
-            dosya['YukleyenID'], 'yuklendi',
-            f'Veriler Aktarıldı: {dosya["OrijinalAd"]}',
-            mesaj, dosya_id
-        )
-        audit('DOSYA_DB_AKTARIM',
-              f'DosyaID:{dosya_id} Tablo:{tablo_adi} Eklenen:{eklenen} '
-              f'Mod:{mod} BeforeSP:{before_sp} AfterSP:{after_sp}')
-
-        return {'ok': True, 'msg': mesaj, 'kalite': kalite_sonuc}
-
-    except Exception as e:
-        logger.error(f'dosya_db_aktar hatası DosyaID:{dosya_id}: {e}')
-        try:
-            execute(
-                "UPDATE excel_dosya SET Durum='yukleme_hatasi' WHERE DosyaID=%s",
-                (dosya_id,))
-        except Exception:
-            pass
-        if conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
-        return {'ok': False, 'msg': str(e)}
-
 
 # ── Sayfa ──
 
@@ -2105,17 +1727,6 @@ def api_bildirim_okundu():
     except Exception as e:
         return jsonify({'ok': False, 'msg': str(e)})
 
-@app.route("/api/bildirimler/<int:bildirim_id>/okundu", methods=["POST"])
-@api_login_gerekli
-@csrf_protect
-def api_bildirim_tekil_okundu(bildirim_id):
-    try:
-        execute("UPDATE bildirim SET Okundu=1 WHERE BildirimID=%s AND AliciID=%s",
-                (bildirim_id, session.get("kullanici_id")))
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "msg": str(e)})
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODÜL 2 — DOSYA YÜKLEME + ARŞİV + ONAY AKIŞI
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2281,14 +1892,6 @@ def api_dosya_yukle():
                     f'{session.get("kullanici_adi")} tarafından yüklendi.',
                     dosya_id)
 
-        # Onay gerekmiyorsa DB aktarımını arka planda başlat
-        if not onay_gerekli:
-            threading.Thread(
-                target=dosya_db_aktar,
-                args=(dosya_id,),
-                daemon=True
-            ).start()
-
         return jsonify({
             'ok': True,
             'dosya_id': dosya_id,
@@ -2296,7 +1899,7 @@ def api_dosya_yukle():
             'satir_sayisi': satir_sayisi,
             'kolonlar': kolonlar,
             'onay_gerekli': onay_gerekli,
-            'msg': 'Dosya yüklendi, onay bekleniyor.' if onay_gerekli else 'Dosya yüklendi, DB\'ye aktarılıyor…'
+            'msg': 'Dosya yüklendi, onay bekleniyor.' if onay_gerekli else 'Dosya yüklendi.'
         })
     except Exception as e:
         logger.error(f'Dosya yükleme hatası: {e}')
@@ -2447,15 +2050,6 @@ def api_dosya_karar(dosya_id):
                 f'Sebep: {acik}', dosya_id)
 
         audit('DOSYA_KARAR', f'DosyaID:{dosya_id} Karar:{karar}')
-
-        # Onaylandıysa DB aktarımını arka planda başlat
-        if karar == 'onaylandi':
-            threading.Thread(
-                target=dosya_db_aktar,
-                args=(dosya_id,),
-                daemon=True
-            ).start()
-
         return jsonify({'ok': True, 'msg': 'Karar kaydedildi.'})
     except Exception as e:
         return jsonify({'ok': False, 'msg': str(e)})
@@ -2475,30 +2069,6 @@ def api_dosya_onay_gecmisi(dosya_id):
             ORDER BY eo.KararTarihi DESC
         """, (dosya_id,))
         return jsonify({'ok': True, 'gecmis': rows})
-    except Exception as e:
-        return jsonify({'ok': False, 'msg': str(e)})
-
-
-# ─── API: Dosya aktarım durumu (polling için) ────────────────────────────────
-
-@app.route('/api/dosya-durum/<dosya_id>')
-@api_login_gerekli
-def api_dosya_durum(dosya_id):
-    try:
-        dosya = query("""
-            SELECT ed.DosyaID, ed.OrijinalAd, ed.HedefTablo, ed.Durum,
-                   ed.SatirSayisi, ed.YukleTarihi,
-                   yl.EklenenSatir, yl.AtlananSatir, yl.Mesaj AS YukleMesaj,
-                   yl.KalisonucJSON, yl.Tarih AS AktarimTarihi
-            FROM excel_dosya ed
-            LEFT JOIN yukle_log yl ON yl.DosyaID = ed.DosyaID
-            WHERE ed.DosyaID = %s
-            ORDER BY yl.Tarih DESC
-            LIMIT 1
-        """, (dosya_id,), fetchone=True)
-        if not dosya:
-            return jsonify({'ok': False, 'msg': 'Dosya bulunamadı.'})
-        return jsonify({'ok': True, 'dosya': dosya})
     except Exception as e:
         return jsonify({'ok': False, 'msg': str(e)})
 
