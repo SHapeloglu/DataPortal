@@ -1,358 +1,465 @@
 <div align="center">
 
-# ⬡ DataPortal
+# 📊 DataPortal
 
-**MySQL tabanlı kurumsal veri yönetim sistemi**
+**Excel → MySQL ETL Portalı**
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-2.3%2B-black?logo=flask)](https://flask.palletsprojects.com)
+Kurumsal veri yükleme, çok adımlı onay akışı ve kalite kontrolü için geliştirilmiş web tabanlı yönetim platformu.
+
+[![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-3.x-black?logo=flask)](https://flask.palletsprojects.com)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-orange?logo=mysql&logoColor=white)](https://mysql.com)
-[![License](https://img.shields.io/badge/Lisans-MIT-green)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)](https://docker.com)
+[![License](https://img.shields.io/badge/Lisans-Kurumsal-gray)](LICENSE)
 
-Excel dosyalarını tek tıkla MySQL'e aktarın, rol ve yetki tabanlı erişim kontrolüyle yönetin.
-
-[Kurulum](#-kurulum) · [Özellikler](#-özellikler) · [Ekran Görüntüleri](#-ekran-görüntüleri) · [API](#-api-referansı) · [Katkı](#-katkı)
+Excel dosyalarını tek arayüzden MySQL'e aktarın; rol bazlı erişim, onay akışı ve kalite kurallarıyla yönetin.
 
 </div>
 
 ---
 
-## 📋 İçindekiler
+## 🗂️ İçindekiler
 
-- [Proje Hakkında](#-proje-hakkında)
+- [Genel Bakış](#-genel-bakış)
 - [Özellikler](#-özellikler)
-- [Teknoloji Yığını](#-teknoloji-yığını)
+- [Mimari](#-mimari)
 - [Kurulum](#-kurulum)
-- [Yapılandırma](#-yapılandırma)
+- [Kullanım](#-kullanım)
+- [Sayfa Rehberi](#-sayfa-rehberi)
 - [Veritabanı Şeması](#-veritabanı-şeması)
 - [Yetki Sistemi](#-yetki-sistemi)
-- [Sayfa Rehberi](#-sayfa-rehberi)
 - [API Referansı](#-api-referansı)
 - [Güvenlik](#-güvenlik)
-- [Geliştirici Notları](#-geliştirici-notları)
-- [Katkı](#-katkı)
+- [Geliştirme](#-geliştirme)
+- [Roadmap](#-roadmap)
 
 ---
 
-## 🎯 Proje Hakkında
+## 🌐 Genel Bakış
 
-DataPortal, farklı rollere sahip kullanıcıların MySQL veritabanına Excel verisi aktarmasına, mevcut tablolara veri yüklemesine ve erişim yetkilerini merkezi olarak yönetmesine olanak tanıyan bir web uygulamasıdır.
+DataPortal, Excel dosyalarını kurumsal MySQL veritabanlarına güvenli ve denetlenebilir şekilde aktarmak için tasarlanmış bir Flask uygulamasıdır. Dosya yükleme, çok adımlı onay akışı, kalite kontrolü, stored procedure entegrasyonu ve cron tabanlı otomasyon özelliklerini tek bir arayüzde sunar.
+
+**Hedef kullanıcılar:** Veri analisti, data engineer ve kurumsal veri operasyonu ekipleri.
 
 **Temel kullanım senaryoları:**
 
 - İş analistleri Excel raporlarını manuel SQL yazmadan doğrudan veritabanına aktarabilir
-- Veritabanı yöneticileri hangi kullanıcının hangi tablolara erişebileceğini rol bazında belirler
-- Her işlem otomatik olarak loglanır; kim, ne zaman, kaç satır yükledi görülebilir
+- Yöneticiler hangi kullanıcının hangi tablolara, hangi dizinlere erişebileceğini rol bazında belirler
+- Tüm aktarımlar kalite kurallarından geçer; her işlem otomatik audit log'a düşer
+- Admin dışı yüklemeler onay akışına girer; onaylayan atanmış kullanıcılara bildirim gider
 
 ---
 
 ## ✨ Özellikler
 
-| Özellik | Açıklama |
+### 📁 Dosya Yükleme & Onay Akışı
+- **3 Adımlı Wizard:** Dosya & dizin seçimi → Hedef tablo + sütun eşleşme önizlemesi → Özet & Yükleme
+- **Dizin tabanlı erişim kontrolü:** Hiyerarşik klasör yapısı, kullanıcı/rol bazlı izinler
+- **Çok kademeli onay:** Onaylayan atama, onay/red kararı, bildirim sistemi
+- **Admin bypass:** Admin kullanıcılar doğrudan onaylayarak arka planda aktarımı başlatabilir
+- **Dosya arşivi:** Yüklenen tüm Excel dosyaları `excel_store/`'da kalıcı olarak saklanır
+
+### 🔄 ETL İşlemleri
+- **Truncate / Append modları:** Tablo konfigürasyonundan ayarlanabilir
+- **Sütun eşleşme:** Excel sütunları ile DB sütunları otomatik eşleştirilir (büyük/küçük harf duyarsız)
+- **ETL_DATE:** Her yüklemeye otomatik timestamp eklenir
+- **Duplicate kontrolü:** Append modunda tekrar eden satırlar atlanır
+- **BeforeSP / AfterSP:** Aktarım öncesi ve sonrası stored procedure desteği
+
+### ✅ Kalite Kontrolü
+- Sütun bazında kural tanımlama (boş değer, benzersizlik, vb.)
+- Hata seviyesi: `hata` (aktarımı durdurur) / `uyari` (loglanır, devam eder)
+- Kalite raporu `yukle_log` tablosuna JSON olarak kaydedilir
+
+### 🔔 Bildirim Sistemi
+- Gerçek zamanlı bildirim paneli (5 saniyede bir polling)
+- Okundu / okunmadı yönetimi
+
+| Tip | Açıklama |
 |---|---|
-| 🔐 **2 Adımlı Giriş** | Önce DB bağlantısı, sonra kullanıcı kimlik doğrulaması |
-| 📊 **Excel → Tablo Oluştur** | `.xlsx` / `.xls` dosyasından otomatik tablo şeması üretir |
-| 📥 **Excel → Tabloya Yükle** | Mevcut tabloya veri aktarır; tekrar eden satırları atlar |
-| 🗑️ **Tablo Sil** | Yetki kapsamındaki tabloları güvenli siler |
-| 👥 **Kullanıcı Yönetimi** | Tam CRUD — kullanıcı ekle, düzenle, sil |
-| 🎭 **Rol Yönetimi** | Rol oluştur, yetki ve tablo ata |
-| 🔑 **Yetki Yönetimi** | İnce taneli yetki tanımları |
-| 📈 **ETL Log** | Her yükleme işlemi kayıt altına alınır |
-| 📋 **Audit Log** | Giriş, silme, kullanıcı işlemleri gibi kritik olaylar izlenir |
-| 📌 **Özelleştirilebilir Dashboard** | Hızlı erişim kartları sürükle-bırak ile yeniden düzenlenir |
-| 🔒 **Scrypt/Bcrypt Şifreleme** | Tüm şifreler hash'lenerek saklanır; her iki format da desteklenir |
-| 💾 **DB Profil Yönetimi** | Bağlantı bilgileri tarayıcıda profil olarak kaydedilebilir (şifre hariç) |
-| 🎯 **Alan Seçimi** | Tablo oluştururken Excel'deki alanlar tek tek seçilebilir |
-| 🔗 **Connection Pooling** | MySQL bağlantıları pool ile verimli yönetilir |
+| `onay_bekliyor` | Onay bekleyen dosya bildirimi |
+| `onaylandi` | Dosya onaylandı |
+| `reddedildi` | Dosya reddedildi |
+| `yuklendi` | DB aktarımı başarılı |
+| `yukleme_hatasi` | DB aktarımı başarısız |
+| `kalite_uyari` | Kalite uyarısı |
+| `kalite_hatasi` | Kalite hatası |
+| `cron_hata` | Cron görevi hatası |
+| `sistem` | Sistem bildirimi |
+
+### ⏰ Cron & Otomasyon
+- APScheduler ile zamanlanmış stored procedure çalıştırma
+- Aktif/pasif cron yönetimi, son çalışma logu
+
+### 🔒 Güvenlik
+- CSRF koruması (tüm state-değiştiren endpoint'lerde)
+- Brute-force koruması (rate limiting)
+- Şifre hashing (werkzeug bcrypt)
+- SQL injection koruması (`sanitize()`)
+- Audit log: her kritik işlem kaydedilir
 
 ---
 
-## 🛠 Teknoloji Yığını
+## 🏗️ Mimari
 
-**Backend**
-- [Flask 2.3+](https://flask.palletsprojects.com/) — Web framework
-- [mysql-connector-python](https://dev.mysql.com/doc/connector-python/en/) — MySQL sürücüsü
-- [pandas](https://pandas.pydata.org/) — Excel okuma ve veri işleme
-- [openpyxl](https://openpyxl.readthedocs.io/) — `.xlsx` desteği
-- [Werkzeug](https://werkzeug.palletsprojects.com/) — Şifre hash'leme, güvenli dosya adı
+```
+DataPortal_son/
+├── app.py               # Tek dosya uygulama (~2500+ satır)
+├── templates/           # Jinja2 şablonları (volume mount)
+│   ├── base.html        # Ana layout: accordion nav, bildirim paneli, logout
+│   ├── dosya_yukle.html # 3 adımlı yükleme wizard
+│   ├── onay_bekleyenler.html
+│   ├── kalite_kurallari.html
+│   ├── tablo_konfig.html
+│   ├── dizin_yonetimi.html
+│   ├── cron_yonetimi.html
+│   ├── audit_log.html
+│   └── ...
+├── uploads/             # Geçici yükleme dizini (volume mount)
+├── excel_store/         # Kalıcı dosya arşivi (bind mount, chmod 777)
+├── .env                 # Çevre değişkenleri
+└── docker-compose.yml
+```
 
-**Frontend**
-- Saf HTML/CSS/JS — framework bağımlılığı yok
-- [DM Sans & DM Mono](https://fonts.google.com/) — Tipografi
-- Koyu tema, CSS değişkenleri ile özelleştirilebilir
+### Stack
 
-**Veritabanı**
-- MySQL 8.0+ (utf8mb4 / unicode_ci)
+| Katman | Teknoloji |
+|---|---|
+| Backend | Python 3.11 + Flask |
+| Veritabanı | MySQL 8.0+ |
+| ORM/Driver | mysql-connector-python |
+| Veri İşleme | pandas + openpyxl |
+| Zamanlayıcı | APScheduler |
+| Container | Docker + Compose |
+| Web Sunucu | Gunicorn |
+
+### Bağlantı Yönetimi
+
+```
+Request içi:         query() / execute()  →  Flask g nesnesi üzerinden pool
+Background thread:   get_conn_direct()    →  .env'den direkt bağlantı
+```
 
 ---
 
 ## 🚀 Kurulum
 
 ### Gereksinimler
+- Docker & Docker Compose
+- Git
 
-- Python 3.10+
-- MySQL 8.0+
-- pip
-
-### Adım Adım
+### 1. Repoyu klonla
 
 ```bash
-# 1. Repoyu klonlayın
 git clone https://github.com/kullanici/dataportal.git
 cd dataportal
-
-# 2. Sanal ortam oluşturun (önerilir)
-python -m venv venv
-source venv/bin/activate        # Linux/macOS
-venv\Scripts\activate           # Windows
-
-# 3. Bağımlılıkları yükleyin
-pip install -r requirements.txt
-
-# 4. Ortam değişkenlerini ayarlayın
-cp .env.example .env
-# .env dosyasını açıp SECRET_KEY değerini güncelleyin
 ```
 
-#### Güçlü SECRET_KEY üretmek için:
+### 2. `.env` dosyasını oluştur
+
+```env
+SECRET_KEY=guclu-gizli-anahtar-buraya
+DB_HOST=db
+DB_PORT=3306
+DB_USER=dpuser
+DB_PASSWORD=guclu-sifre-buraya
+DB_NAME=dataportal
+DB_ROOT_PASSWORD=root-sifre-buraya
+HTTPS=false
+```
+
+Güçlü `SECRET_KEY` üretmek için:
 
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-```bash
-# 5. Veritabanını hazırlayın
-mysql -u root -p veritabani_adi < migration.sql
+### 3. Dizinleri oluştur ve izin ver
 
-# 6. Uygulamayı başlatın
-python app.py
+```bash
+mkdir -p excel_store uploads
+chmod 777 excel_store
 ```
 
-Tarayıcıda **http://localhost:5000** adresini açın.
+### 4. Container'ları başlat
+
+```bash
+docker compose up -d
+```
+
+### 5. DB migration (ilk kurulumda)
+
+```sql
+CREATE TABLE IF NOT EXISTS yukle_log (
+    LogID         INT AUTO_INCREMENT PRIMARY KEY,
+    DosyaID       VARCHAR(36),
+    TabloAdi      VARCHAR(100),
+    Durum         ENUM('basarili','hata','uyari'),
+    Mesaj         TEXT,
+    EklenenSatir  INT DEFAULT 0,
+    AtlananSatir  INT DEFAULT 0,
+    KalisonucJSON JSON,
+    Tarih         DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE excel_dosya
+  MODIFY COLUMN Durum ENUM(
+    'bekliyor','onaylandi','reddedildi',
+    'yukleniyor','yuklendi','yukleme_hatasi'
+  ) DEFAULT 'bekliyor';
+```
+
+Uygulama `http://localhost:5001` adresinde çalışmaya başlar.
 
 ---
 
-## ⚙️ Yapılandırma
+## 📖 Kullanım
 
-### `.env` Dosyası
+### Excel Dosyası Yükleme
 
-```env
-# Flask oturum güvenlik anahtarı — production'da mutlaka değiştirin
-SECRET_KEY=buraya_guclu_rastgele_bir_deger_yazin
+1. **Dosya Yükle** menüsüne git
+2. **Adım 1:** Excel dosyasını seç, dizin belirle
+3. **Adım 2:** Hedef MySQL tablosunu seç, sütun eşleşmelerini kontrol et
+4. **Adım 3:** Özeti gözden geçir, yükle
 
-# Debug modu — production'da false olmalı
-FLASK_DEBUG=false
+> Admin kullanıcılar dosyayı anında onaylayarak aktarımı başlatır.
+> Normal kullanıcılar için dizinde tanımlı onaylayanlara bildirim gider.
+
+### Onay Akışı
+
+```
+Dosya Yüklendi
+    │
+    ▼
+[Admin?] ──Evet──► Otomatik Onay ──► dosya_db_aktar() ──► Tamamlandı
+    │
+   Hayır
+    │
+    ▼
+Onaylayanlara Bildirim
+    │
+    ▼
+Onaylayan Karar Verir (Onay / Red)
+    │
+    ▼ Onay
+dosya_db_aktar()
+    │
+    ├── BeforeSP çalıştır
+    ├── Excel → MySQL aktar (truncate / append)
+    ├── Kalite kurallarını kontrol et
+    ├── AfterSP çalıştır
+    └── Kullanıcıya bildirim gönder
 ```
 
-### Uygulama Sabitleri (`app.py`)
+### Tablo Konfigürasyonu
 
-| Sabit | Varsayılan | Açıklama |
-|---|---|---|
-| `MAX_CONTENT_LENGTH` | `16 MB` | Maksimum yükleme boyutu |
-| `UPLOAD_FOLDER` | `uploads/` | Geçici dosya dizini |
-| `IZIN_VERILEN_UZANTILAR` | `.xlsx, .xls` | Kabul edilen dosya türleri |
-| Connection pool `pool_size` | `5` | Eş zamanlı DB bağlantısı |
+`Tablo Konfig` menüsünden her tablo için:
+
+| Alan | Açıklama |
+|---|---|
+| **Yükleme Modu** | `truncate` (sil & doldur) veya `append` (ekle) |
+| **BeforeSP** | Aktarım öncesi çalışacak stored procedure |
+| **AfterSP** | Aktarım sonrası çalışacak stored procedure |
+| **Onay Gerekli** | Bu tabloya yükleme için onay akışı zorunlu mu? |
+
+---
+
+## 📋 Sayfa Rehberi
+
+### Dashboard (`/dashboard`) — Y000001
+Sistem istatistikleri, aktif yetkiler, rol'e atanmış tablolar ve son yükleme bilgileri.
+
+### Dosya Yükle (`/dosya-yukle`) — Y000008
+3 adımlı wizard ile Excel dosyasını seçili dizine yükle, hedef tabloyu belirle, sütun eşleşmelerini önizle.
+
+### Onay Bekleyenler (`/onay-bekleyenler`) — Y000009
+Onay bekleyen dosyaların listesi. Onaylayan kullanıcılar buradan onay/red kararı verir.
+
+### Excel → MySQL Direkt (`/excel-mysql-load`) — Y000004
+Onay akışı olmadan direkt yükleme. Truncate veya append modunda çalışır, ETL_DATE otomatik eklenir.
+
+### Tablo Görüntüle (`/tablo-goruntule`) — Y000005
+Mevcut tabloları sayfalı olarak görüntüle ve dışa aktar.
+
+### Tablo Sil (`/tablo-sil`) — Y000006
+Rol'e atanmış tablolar arasından seçim yaparak silme. Her silme `tablo_log`'a kaydedilir.
+
+### Dizin Yönetimi (`/dizin-yonetimi`) — Y000007
+Hiyerarşik klasör yapısını yönet, dizin bazlı kullanıcı ve onaylayan ata.
+
+### Tablo Konfig (`/tablo-konfig`) — Y000010
+Her tablo için yükleme modu, BeforeSP, AfterSP ve onay zorunluluğu ayarla.
+
+### Kalite Kuralları (`/kalite-kurallari`) — Y000011
+Sütun bazlı kalite kuralları tanımla (boş değer kontrolü, benzersizlik vb.).
+
+### Cron Yönetimi (`/cron-yonetimi`) — Y000012
+APScheduler ile zamanlanmış stored procedure görevlerini yönet.
+
+### Kullanıcılar (`/kullanicilar`) — Y000002
+Tam CRUD yönetimi. Kullanıcıya rol atanır; rol üzerinden yetkiler devralınır.
+
+### Roller (`/roller`) — Y000003
+Rol oluştur, düzenle, sil. Role yetki ve erişilebilir tablo ata.
+
+### Audit Log (`/audit-log`) — Y000001
+Tüm kritik işlemlerin kayıtları: kim, ne zaman, hangi işlemi yaptı.
 
 ---
 
 ## 🗄️ Veritabanı Şeması
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌──────────────┐
-│    kullanici     │────▶│    rol_yetki      │◀────│    yetki     │
-├─────────────────┤     ├──────────────────┤     ├──────────────┤
-│ KullaniciID PK  │     │ RolID  FK        │     │ YetkiID PK   │
-│ KullaniciAdi    │     │ YetkiID FK       │     │ YetkiAdi     │
-│ KullaniciSifresi│     └──────────────────┘     └──────────────┘
-│ KullaniciEposta │
-│ RolID  FK       │────▶┌──────────────────┐
-└─────────────────┘     │       rol         │
-                        ├──────────────────┤
-┌─────────────────┐     │ RolID PK         │
-│   rol_tablo     │◀────│ RolAdi           │
-├─────────────────┤     └──────────────────┘
-│ RolID  FK       │
-│ TablAdi         │     ┌──────────────────┐
-└─────────────────┘     │    tablo_log      │
-                        ├──────────────────┤
-┌─────────────────┐     │ LogID PK         │
-│ kullanici_tercih│     │ Tablo            │
-├─────────────────┤     │ KullaniciID FK   │
-│ KullaniciID FK  │     │ IslemTuru        │
-│ TercihAnahtar   │     │ Eklenen          │
-│ TercihDeger     │     │ Atlanan / Tekrar │
-└─────────────────┘     │ IslemTarihi      │
-                        └──────────────────┘
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  kullanici   │────▶│   rol_yetki  │◀────│    yetki     │
+├──────────────┤     ├──────────────┤     ├──────────────┤
+│ KullaniciID  │     │ RolID  FK    │     │ YetkiID PK   │
+│ KullaniciAdi │     │ YetkiID FK   │     │ YetkiAdi     │
+│ Sifre (hash) │     └──────────────┘     └──────────────┘
+│ Email        │
+│ RolID  FK    │────▶┌──────────────┐     ┌──────────────┐
+└──────────────┘     │     rol      │     │  rol_tablo   │
+                     ├──────────────┤◀────┤──────────────┤
+┌──────────────┐     │ RolID PK     │     │ RolID FK     │
+│ excel_dosya  │     │ RolAdi       │     │ TabloAdi     │
+├──────────────┤     └──────────────┘     └──────────────┘
+│ DosyaID (uuid)│
+│ DizinID FK   │────▶┌──────────────┐
+│ HedefTablo   │     │    dizin     │
+│ Durum        │     ├──────────────┤
+│ YukleyenID   │     │ DizinID PK   │
+│ DosyaYolu    │     │ DizinAdi     │
+└──────┬───────┘     │ UstDizinID   │
+       │             └──────────────┘
+       ▼
+┌──────────────┐     ┌──────────────┐
+│  excel_onay  │     │  yukle_log   │
+├──────────────┤     ├──────────────┤
+│ DosyaID FK   │     │ DosyaID FK   │
+│ OnaylayanID  │     │ TabloAdi     │
+│ Karar        │     │ Durum        │
+│ KararTarihi  │     │ EklenenSatir │
+└──────────────┘     │ KalisonucJSON│
+                     └──────────────┘
 ```
 
 ### Tablo Açıklamaları
 
+**Kullanıcı & Yetki**
+
 | Tablo | Açıklama |
 |---|---|
-| `kullanici` | Sistem kullanıcıları; şifreler bcrypt ile hash'lenir |
-| `rol` | Kullanıcı rolleri (örn. Admin, Analist, Okuyucu) |
-| `yetki` | Atomik yetki tanımları |
-| `rol_yetki` | Rol ↔ Yetki N:N ilişki tablosu |
-| `rol_tablo` | Hangi rolün hangi MySQL tablolarına erişebileceği |
-| `tablo_log` | Excel yükleme/oluşturma/silme işlem geçmişi |
-| `kullanici_tercih` | Dashboard hızlı erişim kartı tercihleri |
+| `kullanici` | KullaniciID, Adi, Sifre hash, Email, RolID, AktifMi |
+| `rol` | RolID, RolAdi, Aciklama |
+| `yetki` | YetkiID (Y000001...), YetkiAdi, Aciklama |
+| `rol_yetki` | Rol ↔ Yetki N:N bağlantısı |
+| `rol_tablo` | Hangi rol hangi MySQL tablolarına erişebilir |
+| `kullanici_tercih` | Kullanıcı tercihleri |
+
+**Dosya & Onay**
+
+| Tablo | Açıklama |
+|---|---|
+| `excel_dosya` | Yüklenen dosyalar, durumları ve meta bilgileri |
+| `excel_onay` | Onay/red kararları ve açıklamaları |
+
+**Dizin**
+
+| Tablo | Açıklama |
+|---|---|
+| `dizin` | Hiyerarşik klasör yapısı |
+| `dizin_yetki` | Dizin bazlı kullanıcı/rol erişim izinleri |
+| `dizin_onaylayan` | Dizin bazlı onaylayan listesi |
+
+**Kalite & Konfig**
+
+| Tablo | Açıklama |
+|---|---|
+| `kalite_kural` | Sütun bazlı kalite kuralları (tip, seviye, aktif) |
+| `tablo_konfig` | Yükleme modu, BeforeSP, AfterSP, onay zorunluluğu |
+
+**Sistem**
+
+| Tablo | Açıklama |
+|---|---|
+| `audit_log` | Tüm kritik işlem kayıtları |
+| `bildirim` | Kullanıcı bildirimleri (okundu/okunmadı) |
+| `tablo_log` | Tablo bazlı yükleme istatistikleri |
+| `yukle_log` | Aktarım detayları + kalite sonuç JSON |
+| `cron_gorev` | Zamanlanmış görevler ve çalışma logları |
 
 ---
 
-## 🔑 Yetki Sistemi
+## 🔐 Yetki Sistemi
 
-Her sayfa ve API endpoint'i, yetki kontrol decorator'larıyla korunur.
+| Kod | Açıklama |
+|---|---|
+| Y000001 | Dashboard erişimi |
+| Y000002 | Kullanıcı yönetimi |
+| Y000003 | Rol yönetimi |
+| Y000004 | Excel → MySQL (direkt yükleme) |
+| Y000005 | Tablo görüntüleme |
+| Y000006 | Tablo silme |
+| Y000007 | Dizin yönetimi |
+| Y000008 | Dosya yükleme (wizard) |
+| Y000009 | Dosya onaylama |
+| Y000010 | Tablo konfigürasyonu |
+| Y000011 | Kalite kuralları |
+| Y000012 | Cron yönetimi |
 
-| YetkiID | Yetki Adı | Erişim Sağladığı Ekranlar |
-|---|---|---|
-| `Y000001` | Kullanıcı Yönetimi | `/kullanicilar` ve tüm CRUD API'leri |
-| `Y000002` | Rol ve Yetki Yönetimi | `/roller`, `/yetkiler` ve CRUD API'leri |
-| `Y000003` | Tablo Oluşturma | `/excel-mysql-create`, `POST /api/excel-upload` |
-| `Y000004` | Tabloya Veri Yükleme | `/excel-mysql-load`, `POST /api/excel-load` |
-| `Y000005` | Tablo Silme | `/tablo-sil`, `POST /api/tablo-sil` |
-| `Y000006` | Tablo Görüntüleme | `/tablo-goruntule` ve export API |
-
-### Rol → Tablo İlişkisi
-
-`rol_tablo` tablosu sayesinde her rol yalnızca atanmış MySQL tablolarına erişebilir:
-
-```
-Admin Rolü → [musteri, siparis, urun]   (3 tabloya tam yetki)
-Analist Rolü → [rapor_q1, rapor_q2]    (sadece rapor tablolarına)
-```
+Her route ve API endpoint'i `@login_gerekli` + `@yetki_gerekli('YXXXXXX')` decorator'larıyla korunur. Tablo erişimi ayrıca `tablo_yetkili_mi()` fonksiyonuyla kontrol edilir.
 
 ---
 
-## 📖 Sayfa Rehberi
+## 📡 API Referansı
 
-### 🔑 Login (`/login`)
-
-İki adımlı oturum açma:
-1. **DB Bağlantısı** — Host, port, kullanıcı adı, şifre, veritabanı adı girilir
-2. **Kullanıcı Girişi** — Sisteme kayıtlı kullanıcı adı ve şifre ile giriş yapılır
-
-### 📊 Dashboard (`/dashboard`)
-
-- Sistem istatistikleri (kullanıcı, rol, yetki sayıları)
-- Aktif yetkiler listesi
-- Rol'e atanmış tablolar ve son yükleme bilgileri
-- Her tablo için yükleme geçmişi modalı
-- Sürükle-bırak ile özelleştirilebilir hızlı erişim kartları
-
-### ⬛ Excel → Tablo Oluştur (`/excel-mysql-create`) — `Y000003`
-
-Excel dosyasının ilk satırını sütun adı olarak kullanarak MySQL'de yeni bir tablo oluşturur. Tüm sütunlar `NVARCHAR(500)` olarak tanımlanır.
-
-**Akış:**
-1. `.xlsx` veya `.xls` dosyası seçin / sürükleyin
-2. "Alanları Görüntüle" butonuna tıklayın
-3. İstenen alanları seçin / kaldırın; tablo adını düzenleyin
-4. "Tabloyu Oluştur" ile sadece seçili alanlardan tablo oluşturulur
-
-### ⬜ Excel → Tabloya Yükle (`/excel-mysql-load`) — `Y000004`
-
-Mevcut bir tabloya Excel verisi aktarır.
-
-**Modlar:**
-- **Sadece Yeni Ekle** — Mevcut satırlarla birebir eşleşen satırları atlar (append)
-- **Tabloyu Temizleyip Yükle** — Önce `TRUNCATE`, sonra tüm satırları ekler
-
-Her yüklemede `ETL_DATE` sütunu otomatik eklenir / güncellenir.
-
-### 🗑️ Tablo Sil (`/tablo-sil`) — `Y000005`
-
-Rol'e atanmış tablolar arasından seçim yaparak silme işlemi gerçekleştirir. Her silme `tablo_log`'a kaydedilir.
-
-### 👥 Kullanıcılar (`/kullanicilar`) — `Y000001`
-
-Tam CRUD yönetimi. Kullanıcıya rol atanır; rol üzerinden yetkiler ve tablo erişimleri devralınır. Kendi hesabını silme engeli mevcuttur.
-
-### 🎭 Roller (`/roller`) — `Y000002`
-
-- Rol oluştur/düzenle/sil
-- Role yetki ata (çoklu seçim)
-- Role erişilebilir MySQL tabloları ata
-
-### 🔑 Yetkiler (`/yetkiler`) — `Y000002`
-
-Sistemdeki atomik yetki tanımlarını yönetir.
-
----
-
-## 🌐 API Referansı
-
-Tüm API endpoint'leri JSON döner. Kimlik doğrulama oturum (session) tabanlıdır.
+Tüm endpoint'ler JSON döner. Kimlik doğrulama oturum (session) tabanlıdır.
 
 ### Kimlik Doğrulama
 
-| Metot | Endpoint | Açıklama |
+| Method | Endpoint | Açıklama |
 |---|---|---|
-| `POST` | `/api/connect` | MySQL bağlantısını test et ve oturuma kaydet |
 | `POST` | `/api/login` | Kullanıcı adı/şifre ile oturum aç |
 | `GET` | `/logout` | Oturumu kapat |
 
-**`POST /api/connect`**
 ```json
-// İstek
-{ "host": "localhost", "port": 3306, "user": "root", "password": "...", "database": "mydb" }
-// Yanıt
-{ "ok": true }
-```
+// POST /api/login — İstek
+{ "username": "ali.veli", "password": "Guclu123!" }
 
-**`POST /api/login`**
-```json
-// İstek
-{ "username": "selim.kilic", "password": "102030" }
-// Yanıt (başarı)
+// Başarı
 { "ok": true }
-// Yanıt (hata)
+
+// Hata
 { "ok": false, "msg": "Kullanıcı adı veya şifre hatalı." }
 ```
 
----
+### Dosya Yükleme Wizard
 
-### Kullanıcılar
+| Method | Endpoint | Açıklama |
+|---|---|---|
+| `POST` | `/api/excel-kolonlar` | Excel dosyasının sütunlarını ve satır sayısını döner |
+| `GET` | `/api/tablo-kolonlar/<tablo>` | DB tablosunun sütunlarını döner |
+| `GET` | `/api/tablolar` | Kullanıcının yetkili tablolarını döner |
+| `GET` | `/api/tablo-konfig-listesi` | Tablo konfigürasyonlarını döner |
+| `POST` | `/api/dosya-yukle` | Dosyayı yükler, onay akışını veya aktarımı başlatır |
 
-| Metot | Endpoint | Yetki | Açıklama |
-|---|---|---|---|
-| `GET` | `/api/kullanicilar?page=1&per_page=50` | Y000001 | Sayfalı liste |
-| `POST` | `/api/kullanicilar` | Y000001 | Yeni kullanıcı |
-| `PUT` | `/api/kullanicilar/<id>` | Y000001 | Güncelle |
-| `DELETE` | `/api/kullanicilar/<id>` | Y000001 | Sil |
-
-**`POST /api/kullanicilar`**
 ```json
-{ "KullaniciAdi": "ali.veli", "KullaniciSifresi": "Guclu123!", "KullaniciEposta": "ali@firma.com", "RolID": "R000002" }
+// POST /api/dosya-yukle — Normal kullanıcı
+{ "ok": true, "msg": "Dosya yüklendi, onay bekleniyor." }
+
+// POST /api/dosya-yukle — Admin (anında aktarım)
+{ "ok": true, "msg": "142 satır aktarıldı. 3 tekrar atlandı." }
 ```
 
----
+### Direkt Excel Yükleme
 
-### Roller
+| Method | Endpoint | Açıklama |
+|---|---|---|
+| `POST` | `/api/excel-load` | Excel verisini doğrudan tabloya aktar |
+| `GET` | `/api/table-columns/<tablo>` | Tablo sütunlarını getir |
 
-| Metot | Endpoint | Yetki | Açıklama |
-|---|---|---|---|
-| `GET` | `/api/roller` | Y000002 | Tüm roller (yetkiler ve tablolar dahil) |
-| `POST` | `/api/roller` | Y000002 | Yeni rol |
-| `PUT` | `/api/roller/<id>` | Y000002 | Güncelle |
-| `DELETE` | `/api/roller/<id>` | Y000002 | Sil |
-
-**`POST /api/roller`**
-```json
-{ "RolAdi": "Analist", "yetkiler": ["Y000003","Y000004"], "tablolar": ["musteri","siparis"] }
 ```
-
----
-
-### Excel İşlemleri
-
-| Metot | Endpoint | Yetki | Açıklama |
-|---|---|---|---|
-| `POST` | `/api/excel-upload` | Y000003 | Excel'den yeni tablo oluştur |
-| `GET` | `/api/table-columns/<tablo>` | Y000004 | Tablo sütunlarını getir |
-| `POST` | `/api/excel-load` | Y000004 | Excel verisi mevcut tabloya yükle |
-
-**`POST /api/excel-load`** — `multipart/form-data`
-```
+// POST /api/excel-load — multipart/form-data
 file       : <Excel dosyası>
 table_name : musteri
 mode       : append | truncate
@@ -363,29 +470,54 @@ mode       : append | truncate
 {
   "success": true,
   "message": "142 yeni satır eklendi. 3 tekrar eden satır atlandı.",
-  "inserted": 142, "duplicates": 3, "skipped": 0,
-  "matched_cols": ["AdSoyad","Telefon","Sehir"],
-  "etl_date": "2026-02-28 14:35:22"
+  "inserted": 142,
+  "duplicates": 3,
+  "skipped": 0,
+  "etl_date": "2026-08-05 14:35:22"
 }
 ```
 
----
+### Bildirim
+
+| Method | Endpoint | Açıklama |
+|---|---|---|
+| `GET` | `/api/bildirimler` | Son 50 bildirim + okunmamış sayısı |
+| `POST` | `/api/bildirimler/okundu` | Tüm bildirimleri okundu işaretle |
+| `POST` | `/api/bildirimler/<id>/okundu` | Tekil bildirimi okundu işaretle |
+
+### Kullanıcı Yönetimi
+
+| Method | Endpoint | Yetki | Açıklama |
+|---|---|---|---|
+| `GET` | `/api/kullanicilar` | Y000002 | Sayfalı liste |
+| `POST` | `/api/kullanicilar` | Y000002 | Yeni kullanıcı |
+| `PUT` | `/api/kullanicilar/<id>` | Y000002 | Güncelle |
+| `DELETE` | `/api/kullanicilar/<id>` | Y000002 | Sil |
+
+### Rol Yönetimi
+
+| Method | Endpoint | Yetki | Açıklama |
+|---|---|---|---|
+| `GET` | `/api/roller` | Y000003 | Tüm roller (yetkiler ve tablolar dahil) |
+| `POST` | `/api/roller` | Y000003 | Yeni rol oluştur |
+| `PUT` | `/api/roller/<id>` | Y000003 | Güncelle |
+| `DELETE` | `/api/roller/<id>` | Y000003 | Sil |
+
+```json
+// POST /api/roller
+{
+  "RolAdi": "Analist",
+  "yetkiler": ["Y000008", "Y000009"],
+  "tablolar": ["musteri", "siparis"]
+}
+```
 
 ### Log & Bilgi
 
-| Metot | Endpoint | Açıklama |
+| Method | Endpoint | Açıklama |
 |---|---|---|
 | `GET` | `/api/tablo-log/<tablo>` | Tablonun son 100 işlem logu |
 | `GET` | `/api/tablo-info/<tablo>` | İlk oluşturma ve son yükleme özeti |
-
----
-
-### Dashboard
-
-| Metot | Endpoint | Açıklama |
-|---|---|---|
-| `GET` | `/api/dashboard-tercih` | Kullanıcının kart tercihlerini getir |
-| `POST` | `/api/dashboard-tercih` | Kart tercihlerini kaydet |
 
 ---
 
@@ -393,96 +525,145 @@ mode       : append | truncate
 
 | Alan | Uygulama |
 |---|---|
-| **Şifre Saklama** | `werkzeug.security` bcrypt (PBKDF2-HMAC-SHA256) |
-| **Oturum Anahtarı** | `.env`'den okunur, production'da `os.urandom(32)` |
-| **Yetki Kontrolü** | Her route ve API endpoint'inde `@login_gerekli` + `@yetki_gerekli` |
-| **Tablo Yetki Kontrolü** | `tablo_yetkili_mi()` — kullanıcı yalnızca rol'üne atanmış tablolara erişir |
-| **Dosya Güvenliği** | `werkzeug.utils.secure_filename` + uzantı whitelist |
-| **SQL Parametre** | Kullanıcı verisi her zaman `%s` parametresiyle geçirilir |
-| **Debug Modu** | `FLASK_DEBUG=true` env değişkeni ile kontrol edilir; varsayılan `false` |
-| **Self-Delete Koruması** | Kullanıcı kendi hesabını silemez |
+| **Şifre Saklama** | `werkzeug.security` bcrypt hash |
+| **Oturum Anahtarı** | `.env`'den okunur |
+| **Yetki Kontrolü** | Her route'da `@login_gerekli` + `@yetki_gerekli` |
+| **Tablo Yetki Kontrolü** | `tablo_yetkili_mi()` — yalnızca rol'e atanmış tablolara erişim |
+| **CSRF Koruması** | `@csrf_protect` — tüm state-değiştiren endpoint'lerde |
+| **Rate Limiting** | `@rate_limit` — brute-force koruması (login) |
+| **Dosya Güvenliği** | `secure_filename` + `.xlsx/.xls` uzantı whitelist |
+| **SQL Injection** | `sanitize()` tablo/kolon adlarına, `%s` parametreli sorgulara |
+| **Self-Delete** | Kullanıcı kendi hesabını silemez |
+| **Audit Log** | Her kritik işlem `audit_log` tablosuna kaydedilir |
 
 > ⚠️ **Production Notları:**
 > - `SECRET_KEY` değerini güçlü bir rastgele değerle değiştirin
 > - HTTPS (TLS) arkasında çalıştırın
 > - MySQL kullanıcısına yalnızca gerekli izinleri verin
-> - Dosya yükleme dizinini (`uploads/`) web'e açık yapmayın
+> - `excel_store/` ve `uploads/` dizinlerini web'e açık yapmayın
 
 ---
 
-## 🧑‍💻 Geliştirici Notları
+## 🛠️ Geliştirme
 
-### Proje Yapısı
-
-```
-dataportal/
-├── app.py                  # Tüm route ve iş mantığı
-├── requirements.txt        # Python bağımlılıkları
-├── migration.sql           # Veritabanı kurulum scripti
-├── .env.example            # Ortam değişkeni şablonu
-├── .env                    # Yerel yapılandırma (git'e eklenmez)
-├── uploads/                # Geçici yükleme dizini (git'e eklenmez)
-└── templates/
-    ├── base.html           # Ortak layout, sidebar, toast, JS yardımcıları
-    ├── login.html          # 2 adımlı giriş ekranı
-    ├── dashboard.html      # Ana panel
-    ├── excel_mysql.html    # Tablo oluşturma
-    ├── excel_mysql_load.html # Veri yükleme
-    ├── tablo_sil.html      # Tablo silme
-    ├── kullanicilar.html   # Kullanıcı yönetimi
-    ├── roller.html         # Rol yönetimi
-    ├── yetkiler.html       # Yetki yönetimi
-    ├── audit_log.html      # Audit log izleme (sadece Admin)
-    ├── yetkisiz.html       # 403 sayfası
-    └── help.html           # Yardım / kullanım kılavuzu
-```
-
-### Yeni Yetki Eklemek
-
-1. `migration.sql`'e `INSERT INTO yetki` satırı ekleyin
-2. İlgili route'a `@yetki_gerekli('YXXXXXX')` decorator'ı ekleyin
-3. Gerekirse `base.html` sidebar'ına koşullu link ekleyin
-
-### Yeni Tablo Alanı Eklemek
-
-ETL akışı tamamen dinamiktir; Excel sütun adları otomatik olarak DB sütunlarıyla eşleştirilir (büyük/küçük harf duyarsız). Yeni sütun için code değişikliği gerekmez.
-
-### Bağımlılıkları Güncellemek
+### Kod Değişikliği Sonrası Deploy
 
 ```bash
-pip install --upgrade -r requirements.txt
-pip freeze > requirements.txt
+# app.py veya template değişikliği (yeterli):
+cd /root/DataPortal_son && docker compose restart web
+
+# requirements.txt veya Dockerfile değişikliği:
+cd /root/DataPortal_son && docker compose up -d --build web
 ```
 
----
+### Loglar
 
-## 🤝 Katkı
+```bash
+# Uygulama logları (canlı):
+docker logs -f dataportal_son-web-1
 
-1. Repo'yu fork'layın
-2. Feature branch oluşturun: `git checkout -b feature/yeni-ozellik`
-3. Değişikliklerinizi commit'leyin: `git commit -m 'feat: yeni özellik açıklaması'`
-4. Branch'i push'layın: `git push origin feature/yeni-ozellik`
-5. Pull Request açın
+# Hata filtreleme:
+docker logs dataportal_son-web-1 2>&1 | grep ERROR
+
+# Belirli bir fonksiyona ait loglar:
+docker logs dataportal_son-web-1 2>&1 | grep -A20 "dosya_db_aktar"
+```
+
+### Korunan Sistem Tabloları
+
+Aşağıdaki tablolar uygulama tarafından korunur; silme ve değiştirme işlemlerine kapatılmıştır:
+
+```
+audit_log, bildirim, cron_gorev, dizin, dizin_onaylayan, dizin_yetki,
+excel_dosya, excel_onay, kalite_kural, kullanici, kullanici_tercih,
+rol, rol_tablo, rol_yetki, tablo_konfig, tablo_log, yetki, yukle_log
+```
+
+### Background Thread Kuralları
+
+`dosya_db_aktar()` ve scheduler görevleri Flask request context dışında çalışır:
+
+```python
+# ✅ DOĞRU — request context gerektirmez
+conn = get_conn_direct()
+_bildirim_direct(alici_id, tip, baslik, mesaj, dosya_id)
+_audit_direct('EYLEM_ADI', 'detay')
+
+# ❌ YANLIŞ — request context gerektirir, background thread'de çöker
+query("SELECT ...")
+execute("INSERT ...")
+bildirim_gonder(...)
+audit(...)
+session['kullanici_id']
+```
+
+### Yeni Yetki Ekleme
+
+1. `yetki` tablosuna `INSERT` satırı ekle
+2. İlgili route'a `@yetki_gerekli('YXXXXXX')` decorator'ı ekle
+3. `base.html` sidebar'ına koşullu link ekle
+
+### Yeni Modül Şablonu
+
+```python
+@app.route('/api/endpoint', methods=['POST'])
+@api_login_gerekli
+@api_yetki_gerekli('Y000XXX')
+@csrf_protect
+def api_endpoint():
+    try:
+        d = request.get_json(force=True)
+        # validasyon → iş mantığı → DB işlemi
+        audit('EYLEM_ADI', 'detay')
+        return jsonify({'ok': True, 'msg': 'Başarılı.'})
+    except Exception as e:
+        logger.error(f'Endpoint hatası: {e}')
+        return jsonify({'ok': False, 'msg': str(e)})
+```
 
 ### Commit Mesajı Formatı
 
 ```
-feat:  yeni özellik
-fix:   hata düzeltme
-docs:  sadece dokümantasyon
-style: kod formatı (işlevsel değişiklik yok)
+feat:     yeni özellik
+fix:      hata düzeltme
+docs:     sadece dokümantasyon
 refactor: yeniden yapılandırma
-test:  test ekleme
+style:    kod formatı (işlevsel değişiklik yok)
+test:     test ekleme
 ```
+
+### Sık Karşılaşılan Hatalar
+
+| Hata | Neden | Çözüm |
+|---|---|---|
+| `Working outside of request context` | Background thread'de `query()`/`session` kullanımı | `get_conn_direct()` kullan |
+| `Invalid cross-device link` | `os.rename()` farklı volume'lar arası | `shutil.move()` kullan |
+| `Permission denied: excel_store` | Container appuser, host dizin root'a ait | `chmod 777 excel_store/` |
+| `Table 'dataportal.X' doesn't exist` | `HedefTablo` alanı yanlış kaydedilmiş | DB'deki kaydı kontrol et |
+
+---
+
+## 📋 Roadmap
+
+- [ ] Dosya versiyonlama (aynı tabloya gelen dosyaların geçmişi)
+- [ ] E-posta bildirimi (SMTP entegrasyonu)
+- [ ] Dashboard istatistikleri (kaç dosya yüklendi, tablo bazlı son yükleme)
+- [ ] Çoklu onaylayan (2/3 onay şartı)
+- [ ] Yükleme kuyruğu (Celery/Redis)
+- [ ] API token desteği (harici sistem entegrasyonu)
+- [ ] Otomatik şema güncellemesi (yeni sütun gelince ALTER TABLE)
+- [ ] Veri soyu (data lineage)
+- [ ] Detaylı kalite raporu (satır bazlı hata)
+- [ ] Yükleme önizleme (onaylamadan önce ilk 10 satır)
 
 ---
 
 ## 📄 Lisans
 
-MIT © 2026 DataPortal
+Bu proje özel/kurumsal kullanım için geliştirilmiştir.
 
 ---
 
 <div align="center">
-<sub>Flask · MySQL · Python ile geliştirildi</sub>
+<sub>Flask · MySQL · Docker ile geliştirildi</sub>
 </div>
